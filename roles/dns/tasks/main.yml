@@ -9,7 +9,7 @@
 
 - name: Write CoreDNS Corefile
   ansible.builtin.template:
-    src: Corefile.j2
+    src: "{{ playbook_dir }}/../templates/Corefile.j2"
     dest: "{{ devastation_paths.dns }}/Corefile"
     owner: root
     group: root
@@ -17,7 +17,7 @@
 
 - name: Write shared Docker Compose file
   ansible.builtin.template:
-    src: compose.yml.j2
+    src: "{{ playbook_dir }}/../templates/compose.yml.j2"
     dest: "{{ devastation_paths.compose }}/compose.yml"
     owner: root
     group: root
@@ -30,6 +30,27 @@
       - dns
     state: present
 
+- name: Add static deva.station names to host file
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} DEVASTATION DEVA.STATION HOSTS"
+    block: |
+      {{ devastation_subnets.dns }} dns.{{ devastation_domain }}
+      {{ devastation_subnets.ca }} ca.{{ devastation_domain }}
+      {{ devastation_subnets.registry }} registry.{{ devastation_domain }}
+      {{ devastation_subnets.apt_cache }} apt-cache.{{ devastation_domain }}
+      {{ devastation_subnets.gitlab }} gitlab.{{ devastation_domain }}
+      {{ devastation_subnets.runner }} runner.{{ devastation_domain }}
+      {{ devastation_subnets.kind }} kind.{{ devastation_domain }}
+      {{ devastation_subnets.service_gateway }} grafana.{{ devastation_domain }}
+      {{ devastation_subnets.service_gateway }} jaeger.{{ devastation_domain }}
+      {{ devastation_subnets.service_gateway }} prometheus.{{ devastation_domain }}
+  when: dns_configure_hosts_file
+
+- name: Gather service facts for resolver configuration
+  ansible.builtin.service_facts:
+  when: dns_configure_host_resolver
+
 - name: Ensure systemd-resolved drop-in directory exists
   ansible.builtin.file:
     path: "{{ dns_systemd_resolved_dropin | dirname }}"
@@ -37,14 +58,25 @@
     owner: root
     group: root
     mode: "0755"
-  when: dns_configure_host_resolver
+  when:
+    - dns_configure_host_resolver
+    - "'systemd-resolved.service' in ansible_facts.services"
 
 - name: Configure host resolver for deva.station
   ansible.builtin.template:
-    src: systemd-resolved-devastation.conf.j2
+    src: "{{ playbook_dir }}/../templates/systemd-resolved-devastation.conf.j2"
     dest: "{{ dns_systemd_resolved_dropin }}"
     owner: root
     group: root
     mode: "0644"
-  when: dns_configure_host_resolver
+  when:
+    - dns_configure_host_resolver
+    - "'systemd-resolved.service' in ansible_facts.services"
   notify: Restart systemd-resolved
+
+- name: Explain skipped systemd-resolved configuration
+  ansible.builtin.debug:
+    msg: "systemd-resolved is not available; /etc/hosts provides host resolution for deva.station names."
+  when:
+    - dns_configure_host_resolver
+    - "'systemd-resolved.service' not in ansible_facts.services"

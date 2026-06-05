@@ -14,6 +14,18 @@ devastation_subnets:
   runner: 172.30.42.15
   kind: 172.30.42.20
 
+devastation_internal_hostnames:
+  - "dns.{{ devastation_domain }}"
+  - "ca.{{ devastation_domain }}"
+  - "registry.{{ devastation_domain }}"
+  - "apt-cache.{{ devastation_domain }}"
+  - "gitlab.{{ devastation_domain }}"
+  - "runner.{{ devastation_domain }}"
+  - "kind.{{ devastation_domain }}"
+  - "grafana.{{ devastation_domain }}"
+  - "jaeger.{{ devastation_domain }}"
+  - "prometheus.{{ devastation_domain }}"
+
 devastation_paths:
   certs: "{{ devastation_root }}/certs"
   ca: "{{ devastation_root }}/ca"
@@ -28,6 +40,7 @@ devastation_paths:
   logs: "{{ devastation_root }}/logs"
 
 base_packages_extra: []
+apt_lock_timeout: 300
 base_packages_default:
   - apt-transport-https
   - bash
@@ -70,7 +83,7 @@ nvm_version: v0.40.1
 nvm_root: "{{ user_setup_home }}/.nvm"
 
 meslo_lgs_nerd_font_enabled: true
-meslo_lgs_nerd_font_version: v3.2.1
+meslo_lgs_nerd_font_base_url: https://raw.githubusercontent.com/romkatv/powerlevel10k-media/master
 meslo_lgs_nerd_font_dir: /usr/local/share/fonts/devastation/MesloLGS
 meslo_lgs_nerd_font_files:
   - MesloLGS NF Regular.ttf
@@ -87,15 +100,38 @@ docker_insecure_registry_fallback: false
 
 neovim_create_config_if_missing: true
 neovim_config_dir: "{{ lookup('env', 'HOME') }}/.config/nvim"
+neovim_install_distro_package: false
+neovim_remove_distro_package: true
+neovim_official_release_url: https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz
+neovim_official_archive: /tmp/devastation-nvim-linux-x86_64.tar.gz
+neovim_install_root: /opt
+neovim_extracted_dir: /opt/nvim-linux-x86_64
+neovim_binary_path: /usr/local/bin/nvim
+neovim_force_official_download: false
+lazyvim_enabled: true
+lazyvim_starter_repo: https://github.com/LazyVim/starter.git
+lazyvim_starter_version: main
 
 dns_upstream_resolvers:
   - 1.1.1.1
   - 9.9.9.9
+dns_configure_hosts_file: true
 dns_configure_host_resolver: true
 dns_systemd_resolved_dropin: /etc/systemd/resolved.conf.d/devastation.conf
 
 ca_install_host_trust: true
+ca_install_browser_nss_trust: true
+ca_nss_cert_name: "Devastation Local Root CA"
 ca_common_name: "Devastation Local Root CA"
+ca_ephemeral_root: true
+ca_force_rotate: false
+ca_rotation_script: /usr/local/bin/devastation-rotate-trust-universe
+ca_leaf_certificates:
+  - "registry.{{ devastation_domain }}"
+  - "gitlab.{{ devastation_domain }}"
+  - "ca.{{ devastation_domain }}"
+  - "apt-cache.{{ devastation_domain }}"
+  - "kind.{{ devastation_domain }}"
 cert_subject_country: US
 cert_valid_days: 825
 
@@ -115,7 +151,6 @@ apt_cache_prefetch_packages:
   - python3-venv
   - jq
   - ripgrep
-  - neovim
 apt_cache_prefetch_images:
   - debian:bookworm-slim
   - ubuntu:24.04
@@ -142,6 +177,7 @@ gitlab_old_logs_path: ""
 gitlab_old_data_path: ""
 
 gitlab_runner_version: "alpine-v17.1.0"
+gitlab_runner_authentication_token: ""
 gitlab_runner_registration_token: ""
 gitlab_runner_executor: docker
 gitlab_runner_docker_image: docker:27

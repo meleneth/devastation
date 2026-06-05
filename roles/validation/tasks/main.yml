@@ -1,7 +1,7 @@
 ---
 - name: Install validation script
   ansible.builtin.template:
-    src: devastation-validate.j2
+    src: "{{ playbook_dir }}/../templates/devastation-validate.j2"
     dest: /usr/local/bin/devastation-validate
     owner: root
     group: root

@@ -1,17 +1,138 @@
 ---
-- name: Install Neovim
+- name: Remove distro Neovim package when official release is preferred
+  ansible.builtin.apt:
+    name: neovim
+    state: absent
+  when: neovim_remove_distro_package | bool
+
+- name: Install distro Neovim package when enabled
   ansible.builtin.apt:
     name: neovim
     state: present
+  when: neovim_install_distro_package | bool
 
-- name: Check for existing Neovim config
+- name: Download official Neovim release archive
+  ansible.builtin.get_url:
+    url: "{{ neovim_official_release_url }}"
+    dest: "{{ neovim_official_archive }}"
+    mode: "0644"
+    force: "{{ neovim_force_official_download | bool }}"
+  when: not (neovim_install_distro_package | bool)
+
+- name: Install official Neovim release when missing
+  ansible.builtin.unarchive:
+    src: "{{ neovim_official_archive }}"
+    dest: "{{ neovim_install_root }}"
+    remote_src: true
+    owner: root
+    group: root
+    creates: "{{ neovim_extracted_dir }}/bin/nvim"
+  when:
+    - not (neovim_install_distro_package | bool)
+    - not (neovim_force_official_download | bool)
+
+- name: Refresh official Neovim release when requested
+  ansible.builtin.unarchive:
+    src: "{{ neovim_official_archive }}"
+    dest: "{{ neovim_install_root }}"
+    remote_src: true
+    owner: root
+    group: root
+  when:
+    - not (neovim_install_distro_package | bool)
+    - neovim_force_official_download | bool
+
+- name: Link official Neovim binary
+  ansible.builtin.file:
+    src: "{{ neovim_extracted_dir }}/bin/nvim"
+    dest: "{{ neovim_binary_path }}"
+    state: link
+    owner: root
+    group: root
+  when: not (neovim_install_distro_package | bool)
+
+- name: Check for existing Neovim config directory
+  ansible.builtin.stat:
+    path: "{{ neovim_config_dir }}"
+  become: true
+  become_user: "{{ devastation_user }}"
+  register: neovim_config_dir_stat
+
+- name: Check for existing Neovim init.lua
   ansible.builtin.stat:
     path: "{{ neovim_config_dir }}/init.lua"
   become: true
   become_user: "{{ devastation_user }}"
-  register: neovim_init
+  register: neovim_init_stat
 
-- name: Create Neovim config directory when absent
+- name: Read existing Neovim init.lua
+  ansible.builtin.slurp:
+    path: "{{ neovim_config_dir }}/init.lua"
+  become: true
+  become_user: "{{ devastation_user }}"
+  register: neovim_init_existing
+  when: neovim_init_stat.stat.exists
+
+- name: Default devastation minimal Neovim config detection
+  ansible.builtin.set_fact:
+    neovim_has_devastation_minimal_config: false
+
+- name: Detect devastation minimal Neovim config
+  ansible.builtin.set_fact:
+    neovim_existing_init_text: "{{ neovim_init_existing.content | default('') | b64decode }}"
+    neovim_has_devastation_minimal_config: >-
+      {{
+        neovim_init_stat.stat.exists
+        and 'vim.keymap.set("n", "<leader>w", "<cmd>write<cr>")' in (neovim_init_existing.content | default('') | b64decode)
+        and 'vim.opt.relativenumber = true' in (neovim_init_existing.content | default('') | b64decode)
+      }}
+  when: neovim_init_stat.stat.exists
+
+- name: Move generated minimal Neovim config aside for LazyVim
+  ansible.builtin.command:
+    argv:
+      - mv
+      - "{{ neovim_config_dir }}"
+      - "{{ neovim_config_dir }}.devastation-minimal.{{ ansible_date_time.epoch }}.bak"
+  become: true
+  become_user: "{{ devastation_user }}"
+  when:
+    - lazyvim_enabled | bool
+    - neovim_has_devastation_minimal_config
+
+- name: Refresh Neovim config directory state after possible backup
+  ansible.builtin.stat:
+    path: "{{ neovim_config_dir }}"
+  become: true
+  become_user: "{{ devastation_user }}"
+  register: neovim_config_dir_after_backup
+
+- name: Install LazyVim starter when no config exists
+  ansible.builtin.git:
+    repo: "{{ lazyvim_starter_repo }}"
+    dest: "{{ neovim_config_dir }}"
+    version: "{{ lazyvim_starter_version }}"
+    recursive: false
+    update: false
+  become: true
+  become_user: "{{ devastation_user }}"
+  when:
+    - neovim_create_config_if_missing | bool
+    - lazyvim_enabled | bool
+    - not neovim_config_dir_after_backup.stat.exists
+
+- name: Remove LazyVim starter git metadata
+  ansible.builtin.file:
+    path: "{{ neovim_config_dir }}/.git"
+    state: absent
+  become: true
+  become_user: "{{ devastation_user }}"
+  when:
+    - neovim_create_config_if_missing | bool
+    - lazyvim_enabled | bool
+    - not neovim_config_dir_after_backup.stat.exists
+
+- name: Create Neovim config directory when absent and LazyVim is disabled
   ansible.builtin.file:
     path: "{{ neovim_config_dir }}"
     state: directory
@@ -19,16 +140,27 @@
     group: "{{ devastation_user }}"
     mode: "0755"
   when:
-    - neovim_create_config_if_missing
-    - not neovim_init.stat.exists
+    - neovim_create_config_if_missing | bool
+    - not (lazyvim_enabled | bool)
+    - not neovim_config_dir_after_backup.stat.exists
 
-- name: Install minimal Neovim config when absent
+- name: Install minimal Neovim config when absent and LazyVim is disabled
   ansible.builtin.template:
-    src: init.lua.j2
+    src: "{{ playbook_dir }}/../templates/init.lua.j2"
     dest: "{{ neovim_config_dir }}/init.lua"
     owner: "{{ devastation_user }}"
     group: "{{ devastation_user }}"
     mode: "0644"
   when:
-    - neovim_create_config_if_missing
-    - not neovim_init.stat.exists
+    - neovim_create_config_if_missing | bool
+    - not (lazyvim_enabled | bool)
+    - not neovim_init_stat.stat.exists
+
+- name: Explain preserved existing Neovim config
+  ansible.builtin.debug:
+    msg: "Existing Neovim config preserved at {{ neovim_config_dir }}; LazyVim starter was not installed."
+  when:
+    - neovim_create_config_if_missing | bool
+    - lazyvim_enabled | bool
+    - neovim_config_dir_after_backup.stat.exists
+    - not neovim_has_devastation_minimal_config

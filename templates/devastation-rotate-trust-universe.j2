@@ -1,0 +1,322 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODE="${1:-rotate}"
+ROOT="{{ devastation_root }}"
+CA_DIR="{{ devastation_paths.ca }}"
+CERTS_DIR="{{ devastation_paths.certs }}"
+PUBLIC_CA_CERT="/usr/local/share/ca-certificates/devastation-root-ca.crt"
+COMPOSE_FILE="{{ devastation_paths.compose }}/compose.yml"
+DOMAIN="{{ devastation_domain }}"
+CA_NAME="{{ ca_common_name }}"
+CA_NSS_NAME="{{ ca_nss_cert_name }}"
+USER_NAME="{{ devastation_user }}"
+USER_HOME="{{ user_setup_home }}"
+VALID_DAYS="{{ cert_valid_days }}"
+CERT_COUNTRY="{{ cert_subject_country }}"
+REGISTRY_HOST="registry.${DOMAIN}"
+REGISTRY_DOCKER_TRUST="/etc/docker/certs.d/${REGISTRY_HOST}"
+STAGING_ROOT=""
+CA_PRIVATE_KEY=""
+
+ALL_HOSTNAMES=(
+{% for hostname in devastation_internal_hostnames %}
+  "{{ hostname }}"
+{% endfor %}
+)
+
+LEAF_CERTS=(
+{% for cert_name in ca_leaf_certificates %}
+  "{{ cert_name }}"
+{% endfor %}
+)
+
+log() {
+  printf '[devastation-ca] %s\n' "$*"
+}
+
+destroy_ca_private_key() {
+  local key="${1:-}"
+  if [[ -n "$key" && -f "$key" ]]; then
+    chmod 0600 "$key" || true
+    if command -v shred >/dev/null 2>&1; then
+      shred -u "$key" || rm -f "$key"
+    else
+      rm -f "$key"
+    fi
+    log "CA private key destroyed: ${key}"
+  fi
+}
+
+cleanup_on_failure() {
+  local code="$?"
+  if [[ "$code" != "0" ]]; then
+    log "rotation failed; destroying temporary CA private key and preserving previous working certificates"
+    destroy_ca_private_key "$CA_PRIVATE_KEY"
+    if [[ -n "$STAGING_ROOT" && -d "$STAGING_ROOT" ]]; then
+      rm -rf "$STAGING_ROOT"
+    fi
+  fi
+  exit "$code"
+}
+
+trap cleanup_on_failure EXIT
+
+require_root() {
+  if [[ "${EUID}" != "0" ]]; then
+    echo "Must run as root. Try: sudo $0" >&2
+    exit 1
+  fi
+}
+
+run_as_devastation_user() {
+  if command -v runuser >/dev/null 2>&1; then
+    runuser -u "$USER_NAME" -- "$@"
+  else
+    sudo -u "$USER_NAME" "$@"
+  fi
+}
+
+write_leaf_openssl_config() {
+  local name="$1"
+  local config="$2"
+  {
+    printf '%s\n' '[req]'
+    printf '%s\n' 'distinguished_name = req_distinguished_name'
+    printf '%s\n' 'req_extensions = req_ext'
+    printf '%s\n' 'prompt = no'
+    printf '\n%s\n' '[req_distinguished_name]'
+    printf 'C = %s\n' "$CERT_COUNTRY"
+    printf '%s\n' 'O = devastation'
+    printf 'CN = %s\n' "$name"
+    printf '\n%s\n' '[req_ext]'
+    printf '%s\n' 'subjectAltName = @alt_names'
+    printf '\n%s\n' '[alt_names]'
+    local i=1
+    local host
+    for host in "${ALL_HOSTNAMES[@]}"; do
+      printf 'DNS.%d = %s\n' "$i" "$host"
+      i=$((i + 1))
+    done
+  } > "$config"
+}
+
+verify_keypair_matches() {
+  local cert="$1"
+  local key="$2"
+  local cert_pub key_pub
+  cert_pub="$(openssl x509 -in "$cert" -pubkey -noout | openssl sha256)"
+  key_pub="$(openssl pkey -in "$key" -pubout | openssl sha256)"
+  [[ "$cert_pub" == "$key_pub" ]]
+}
+
+verify_leaf_sans() {
+  local cert="$1"
+  local host
+  local cert_text
+  cert_text="$(openssl x509 -in "$cert" -noout -text)"
+  for host in "${ALL_HOSTNAMES[@]}"; do
+    grep -q "DNS:${host}" <<<"$cert_text"
+  done
+}
+
+generate_trust_universe() {
+  STAGING_ROOT="$(mktemp -d "${CERTS_DIR}/.rotation.XXXXXX")"
+  chmod 0700 "$STAGING_ROOT"
+  CA_PRIVATE_KEY="${STAGING_ROOT}/root-ca.key"
+  local staged_ca_crt="${STAGING_ROOT}/root-ca.crt"
+  local staged_certs="${STAGING_ROOT}/certs"
+  mkdir -p "$staged_certs"
+
+  log "generating temporary root CA key"
+  openssl genrsa -out "$CA_PRIVATE_KEY" 4096 >/dev/null 2>&1
+  chmod 0600 "$CA_PRIVATE_KEY"
+
+  log "generating root CA certificate"
+  openssl req -x509 -new -nodes \
+    -key "$CA_PRIVATE_KEY" \
+    -sha256 \
+    -days 3650 \
+    -subj "/C=${CERT_COUNTRY}/O=devastation/CN=${CA_NAME}" \
+    -out "$staged_ca_crt"
+  chmod 0644 "$staged_ca_crt"
+
+  local name cert_dir config csr key crt
+  for name in "${LEAF_CERTS[@]}"; do
+    log "generating leaf certificate: ${name}"
+    cert_dir="${staged_certs}/${name}"
+    mkdir -p "$cert_dir"
+    config="${cert_dir}/openssl.cnf"
+    csr="${cert_dir}/tls.csr"
+    key="${cert_dir}/tls.key"
+    crt="${cert_dir}/tls.crt"
+
+    write_leaf_openssl_config "$name" "$config"
+    openssl genrsa -out "$key" 2048 >/dev/null 2>&1
+    chmod 0600 "$key"
+    openssl req -new -key "$key" -out "$csr" -config "$config"
+    openssl x509 -req \
+      -in "$csr" \
+      -CA "$staged_ca_crt" \
+      -CAkey "$CA_PRIVATE_KEY" \
+      -CAcreateserial \
+      -out "$crt" \
+      -days "$VALID_DAYS" \
+      -sha256 \
+      -extensions req_ext \
+      -extfile "$config" >/dev/null 2>&1
+    chmod 0644 "$crt"
+
+    openssl verify -CAfile "$staged_ca_crt" "$crt" >/dev/null
+    verify_keypair_matches "$crt" "$key"
+    verify_leaf_sans "$crt"
+    rm -f "$csr" "$config"
+  done
+}
+
+install_trust_artifacts() {
+  local staged_ca_crt="${STAGING_ROOT}/root-ca.crt"
+  local staged_certs="${STAGING_ROOT}/certs"
+  mkdir -p "$CA_DIR" "$CERTS_DIR"
+  chmod 0700 "$CA_DIR"
+
+  if [[ -f "${CA_DIR}/root-ca.key" ]]; then
+    log "destroying previously retained CA private key: ${CA_DIR}/root-ca.key"
+    destroy_ca_private_key "${CA_DIR}/root-ca.key"
+  fi
+  rm -f "${CA_DIR}/root-ca.srl" "${CA_DIR}/root-ca.crl" "${CA_DIR}/index.txt" "${CA_DIR}/serial"
+
+  install -m 0644 "$staged_ca_crt" "${CA_DIR}/root-ca.crt"
+  install -m 0644 "$staged_ca_crt" /usr/local/share/ca-certificates/devastation-root-ca.crt
+  update-ca-certificates >/dev/null
+
+  local name
+  for name in "${LEAF_CERTS[@]}"; do
+    mkdir -p "${CERTS_DIR}/${name}"
+    install -m 0600 "${staged_certs}/${name}/tls.key" "${CERTS_DIR}/${name}/tls.key"
+    install -m 0644 "${staged_certs}/${name}/tls.crt" "${CERTS_DIR}/${name}/tls.crt"
+  done
+
+  mkdir -p "$REGISTRY_DOCKER_TRUST"
+  install -m 0644 "$staged_ca_crt" "${REGISTRY_DOCKER_TRUST}/ca.crt"
+}
+
+install_nss_trust_one_db() {
+  local db="$1"
+  if ! command -v certutil >/dev/null 2>&1; then
+    return 0
+  fi
+  if certutil -L -d "sql:${db}" -n "$CA_NSS_NAME" >/dev/null 2>&1; then
+    certutil -D -d "sql:${db}" -n "$CA_NSS_NAME" >/dev/null 2>&1 || true
+  fi
+  certutil -A -d "sql:${db}" -n "$CA_NSS_NAME" -t "C,," -i "$PUBLIC_CA_CERT"
+}
+
+install_nss_trust() {
+  if ! command -v certutil >/dev/null 2>&1; then
+    log "certutil not found; skipping browser NSS trust"
+    return 0
+  fi
+  local user_nss="${USER_HOME}/.pki/nssdb"
+  install -d -m 0700 -o "$USER_NAME" -g "$USER_NAME" "$user_nss"
+  if [[ ! -f "${user_nss}/cert9.db" ]]; then
+    run_as_devastation_user certutil -N -d "sql:${user_nss}" --empty-password
+  fi
+  run_as_devastation_user bash -c "$(declare -f install_nss_trust_one_db); CA_NSS_NAME='$CA_NSS_NAME'; PUBLIC_CA_CERT='$PUBLIC_CA_CERT'; install_nss_trust_one_db '$user_nss'"
+
+  local firefox_root="${USER_HOME}/.mozilla/firefox"
+  if [[ -d "$firefox_root" ]]; then
+    while IFS= read -r -d '' cert_db; do
+      local db_dir
+      db_dir="$(dirname "$cert_db")"
+      run_as_devastation_user bash -c "$(declare -f install_nss_trust_one_db); CA_NSS_NAME='$CA_NSS_NAME'; PUBLIC_CA_CERT='$PUBLIC_CA_CERT'; install_nss_trust_one_db '$db_dir'"
+    done < <(find "$firefox_root" -name cert9.db -type f -print0)
+  fi
+}
+
+install_kind_trust() {
+  if ! command -v kind >/dev/null 2>&1 || ! command -v docker >/dev/null 2>&1; then
+    return 0
+  fi
+  local clusters nodes node
+  clusters="$(kind get clusters 2>/dev/null || true)"
+  if ! grep -qx "{{ kind_cluster_name }}" <<<"$clusters"; then
+    return 0
+  fi
+  nodes="$(kind get nodes --name "{{ kind_cluster_name }}" 2>/dev/null || true)"
+  for node in $nodes; do
+    docker exec "$node" mkdir -p "/etc/containerd/certs.d/${REGISTRY_HOST}"
+    docker cp "${CA_DIR}/root-ca.crt" "$node:/etc/containerd/certs.d/${REGISTRY_HOST}/ca.crt"
+    docker exec "$node" sh -c "printf '%s\n' \
+      'server = \"https://${REGISTRY_HOST}\"' \
+      '' \
+      '[host.\"https://${REGISTRY_HOST}\"]' \
+      '  capabilities = [\"pull\", \"resolve\"]' \
+      '  ca = \"/etc/containerd/certs.d/${REGISTRY_HOST}/ca.crt\"' \
+      > '/etc/containerd/certs.d/${REGISTRY_HOST}/hosts.toml'"
+    docker exec "$node" systemctl restart containerd >/dev/null 2>&1 || true
+  done
+}
+
+restart_affected_services() {
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl restart docker >/dev/null 2>&1 || true
+  fi
+  if [[ -f "$COMPOSE_FILE" ]] && command -v docker >/dev/null 2>&1; then
+    docker compose -f "$COMPOSE_FILE" restart registry gitlab gitlab-runner >/dev/null 2>&1 || true
+  fi
+}
+
+verify_installed_universe() {
+  local name
+  for name in "${LEAF_CERTS[@]}"; do
+    openssl verify -CAfile "${CA_DIR}/root-ca.crt" "${CERTS_DIR}/${name}/tls.crt" >/dev/null
+    verify_keypair_matches "${CERTS_DIR}/${name}/tls.crt" "${CERTS_DIR}/${name}/tls.key"
+    verify_leaf_sans "${CERTS_DIR}/${name}/tls.crt"
+  done
+  if [[ -e "${CA_DIR}/root-ca.key" ]]; then
+    echo "CA private key still exists at ${CA_DIR}/root-ca.key" >&2
+    exit 1
+  fi
+}
+
+main() {
+  require_root
+  mkdir -p "$CA_DIR" "$CERTS_DIR"
+  chmod 0700 "$CA_DIR"
+
+  if [[ "$MODE" == "--verify-only" ]]; then
+    verify_installed_universe
+    log "verification ok; CA private key is absent"
+    return 0
+  fi
+
+  if [[ "$MODE" != "rotate" && "$MODE" != "--rotate" && "$MODE" != "--bootstrap" ]]; then
+    echo "Usage: $0 [--bootstrap|--rotate|--verify-only]" >&2
+    exit 2
+  fi
+
+  log "starting full trust-universe rotation for ${DOMAIN}"
+  generate_trust_universe
+  install_trust_artifacts
+  install_nss_trust
+  install_kind_trust
+  destroy_ca_private_key "$CA_PRIVATE_KEY"
+  CA_PRIVATE_KEY=""
+  rm -rf "$STAGING_ROOT"
+  STAGING_ROOT=""
+  verify_installed_universe
+  restart_affected_services
+
+  log "CA certificate retained: ${CA_DIR}/root-ca.crt"
+  log "CA private key destroyed; future certificate issuance requires full trust-universe rotation"
+  log "retained leaf certificates and private keys:"
+  local name
+  for name in "${LEAF_CERTS[@]}"; do
+    log "  ${CERTS_DIR}/${name}/tls.crt"
+    log "  ${CERTS_DIR}/${name}/tls.key"
+  done
+}
+
+main "$@"
+trap - EXIT

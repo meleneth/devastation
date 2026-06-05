@@ -33,7 +33,7 @@
 
 - name: Write KIND cluster config
   ansible.builtin.template:
-    src: kind-config.yml.j2
+    src: "{{ playbook_dir }}/../templates/kind-config.yml.j2"
     dest: "{{ devastation_paths.kind }}/kind-config.yml"
     owner: root
     group: root

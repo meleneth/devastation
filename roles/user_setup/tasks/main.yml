@@ -25,6 +25,7 @@
     repo: "{{ pyenv_repo }}"
     dest: "{{ pyenv_root }}"
     version: master
+    recursive: false
     update: false
   become: true
   become_user: "{{ devastation_user }}"
@@ -34,6 +35,7 @@
     repo: "{{ rbenv_repo }}"
     dest: "{{ rbenv_root }}"
     version: master
+    recursive: false
     update: false
   become: true
   become_user: "{{ devastation_user }}"
@@ -51,15 +53,28 @@
     repo: "{{ ruby_build_repo }}"
     dest: "{{ rbenv_root }}/plugins/ruby-build"
     version: master
+    recursive: false
     update: false
   become: true
   become_user: "{{ devastation_user }}"
+
+- name: Check for failed nvm test fixture submodule
+  ansible.builtin.stat:
+    path: "{{ nvm_root }}/test/fixtures/nvmrc/.git"
+  register: nvm_failed_submodule
+
+- name: Remove failed nvm test fixture submodule directory
+  ansible.builtin.file:
+    path: "{{ nvm_root }}/test/fixtures/nvmrc"
+    state: absent
+  when: nvm_failed_submodule.stat.exists
 
 - name: Clone nvm for target user
   ansible.builtin.git:
     repo: "{{ nvm_repo }}"
     dest: "{{ nvm_root }}"
     version: "{{ nvm_version }}"
+    recursive: false
     update: false
   become: true
   become_user: "{{ devastation_user }}"

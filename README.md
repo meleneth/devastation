@@ -1,6 +1,6 @@
 # devastation
 
-`devastation` builds an idempotent local-first development environment for a Debian or Ubuntu laptop. It uses Ansible, Docker Compose, CoreDNS, a local offline CA, a standalone Docker registry, apt-cacher-ng, KIND, GitLab CE, GitLab Runner, and Neovim.
+`devastation` builds an idempotent local-first development environment for a Debian or Ubuntu laptop. It uses Ansible, Docker Compose, CoreDNS, an ephemeral local root CA workflow, a standalone Docker registry, apt-cacher-ng, KIND, GitLab CE, GitLab Runner, and Neovim.
 
 The internal DNS root is `deva.station`.
 
@@ -10,7 +10,7 @@ Persistent state defaults to `/srv/devastation`:
 
 - `/srv/devastation/compose`: generated Docker Compose project
 - `/srv/devastation/dns`: CoreDNS configuration
-- `/srv/devastation/ca`: offline local root CA material, mode `0700`
+- `/srv/devastation/ca`: retained local root CA certificate only, mode `0700`
 - `/srv/devastation/certs`: generated leaf certificates
 - `/srv/devastation/secrets`: generated secrets, mode `0700`
 - `/srv/devastation/registry`: standalone local registry data
@@ -61,7 +61,15 @@ The `user_setup` role installs language version managers for the target user:
 
 Initialization blocks are added to the configured profile, defaulting to `~/.profile`. The role does not install Python, Ruby, or Node versions by default; it installs the managers so you can choose versions locally.
 
-The `fonts` role installs the patched MesloLGS Nerd Font files system-wide under `/usr/local/share/fonts/devastation/MesloLGS` and refreshes the font cache.
+The `fonts` role installs the patched MesloLGS Nerd Font files from `romkatv/powerlevel10k-media` system-wide under `/usr/local/share/fonts/devastation/MesloLGS` and refreshes the font cache.
+
+The `neovim` role installs the latest official upstream Linux x86_64 Neovim release from GitHub, links it at `/usr/local/bin/nvim`, and removes the old distro `neovim` package by default. It installs LazyVim from the official starter repo only when no user config exists. If the previous generated minimal devastation config is present, it is moved aside to a timestamped backup before LazyVim is installed.
+
+Refresh the official Neovim tarball intentionally:
+
+```bash
+./bin/devastation-up -e neovim_force_official_download=true
+```
 
 ## Hostnames
 
@@ -119,34 +127,47 @@ If a package is unavailable offline, apt will fail clearly. Refresh the cache wh
 
 ## DNS Notes
 
-CoreDNS runs in Docker and binds `127.0.0.1:53` for host access. Ansible can configure `systemd-resolved` with a drop-in at `/etc/systemd/resolved.conf.d/devastation.conf`, using split DNS for `deva.station`.
+CoreDNS runs in Docker and binds `127.0.0.1:53` for host access. Ansible also writes static `deva.station` entries to `/etc/hosts` by default so browser and CLI access work even on systems without `systemd-resolved`. If `systemd-resolved` is present, Ansible configures a drop-in at `/etc/systemd/resolved.conf.d/devastation.conf`, using split DNS for `deva.station`.
 
 Rollback:
 
 ```bash
 sudo rm -f /etc/systemd/resolved.conf.d/devastation.conf
+sudo sed -i '/BEGIN DEVASTATION DEVA.STATION HOSTS/,/END DEVASTATION DEVA.STATION HOSTS/d' /etc/hosts
 sudo systemctl restart systemd-resolved
 docker compose -f /srv/devastation/compose/compose.yml stop dns
 ```
 
-Set `dns_configure_host_resolver: false` to leave host resolver settings untouched.
+Set `dns_configure_host_resolver: false` to leave systemd-resolved settings untouched. Set `dns_configure_hosts_file: false` to avoid writing `/etc/hosts`.
 
 ## Certificate Notes
 
-The CA role creates an offline root:
+The CA role uses an ephemeral root CA private key. During bootstrap or rotation it creates a temporary root CA key in a staging directory, signs every configured local leaf certificate, validates the full chain, installs trust, and immediately destroys the root CA private key. The private key is intentionally not backed up or retained. Reproducibility beats preservation here.
 
-- `/srv/devastation/ca/root-ca.key`, mode `0600`
+Retained artifacts:
+
 - `/srv/devastation/ca/root-ca.crt`
+- `/srv/devastation/certs/*/tls.crt`
+- `/srv/devastation/certs/*/tls.key`, mode `0600`
 
-The root certificate is installed into host trust when `ca_install_host_trust: true`.
+Destroyed artifacts:
 
-Mint an extra certificate:
+- the temporary root CA private key
+- generated CSRs
+- OpenSSL serial and config scratch files
+- any legacy `/srv/devastation/ca/root-ca.key`
+
+The root certificate is installed into host trust when `ca_install_host_trust: true`. The CA role also installs the root into the target user's NSS trust databases when `ca_install_browser_nss_trust: true`, covering Chromium-style `~/.pki/nssdb` trust and existing Firefox profiles under `~/.mozilla/firefox`. Docker receives registry trust under `/etc/docker/certs.d/registry.deva.station/ca.crt`; KIND nodes receive containerd trust when they exist; GitLab Runner sees the retained root certificate through its mounted config.
+
+After rerunning the playbook, restart your browser before checking `https://gitlab.deva.station`. If Firefox creates a new profile later, rerun `./bin/devastation-up` to add the root CA to that new profile.
+
+Rotate the full trust universe:
 
 ```bash
-./bin/devastation-mint-cert service.deva.station
+./bin/devastation-rotate-trust-universe
 ```
 
-The script refuses names outside `deva.station`.
+New hostnames require a full automated rotation because there is no retained CA private key for single-certificate issuance. Add hostnames to `devastation_internal_hostnames` and add required leaf cert names to `ca_leaf_certificates` in `group_vars/all.yml`, then run the rotation command. `./bin/devastation-mint-cert` intentionally refuses single-certificate minting.
 
 ## GitLab
 
@@ -179,7 +200,25 @@ The runner uses the Docker executor. Docker socket mounting is disabled by defau
 gitlab_runner_mount_docker_socket: true
 ```
 
-Automatic registration happens only when `gitlab_runner_registration_token` is supplied. Otherwise the playbook prints the exact rerun variable to use.
+Automatic registration happens only when `gitlab_runner_authentication_token` is supplied. Otherwise the playbook prints the exact rerun variable to use.
+
+To create the token:
+
+1. Open `https://gitlab.deva.station`.
+2. Sign in as an administrator.
+3. Go to `Admin Area` -> `CI/CD` -> `Runners`.
+4. Choose `New instance runner`.
+5. Set the runner description to `runner.deva.station`.
+6. Add tags such as `local`, `devastation`, and `docker`.
+7. Create the runner and copy the `glrt-...` authentication token.
+
+Then run:
+
+```bash
+./bin/devastation-up -e gitlab_runner_authentication_token='glrt-REDACTED'
+```
+
+The older `gitlab_runner_registration_token` variable is still accepted as a legacy fallback, but GitLab 17 disables deprecated registration tokens by default.
 
 ## Recovery Commands
 
@@ -213,9 +252,15 @@ Regenerate by convergence:
 ./bin/devastation-up
 ```
 
+Rotate certificates and reinstall trust:
+
+```bash
+./bin/devastation-rotate-trust-universe
+```
+
 ## Security Posture
 
-No secrets are committed. CA private keys and generated secret directories are not world-readable. Dangerous options are explicit in `group_vars/all.yml`:
+No secrets are committed. The root CA private key is an ephemeral build artifact and is destroyed after signing; validation fails if `/srv/devastation/ca/root-ca.key` exists after rotation. Generated secret directories are not world-readable. Dangerous options are explicit in `group_vars/all.yml`:
 
 - `docker_insecure_registry_fallback`
 - `gitlab_allow_existing_data`

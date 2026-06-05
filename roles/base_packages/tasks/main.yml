@@ -1,8 +1,34 @@
 ---
+- name: Check whether devastation apt proxy is configured
+  ansible.builtin.stat:
+    path: /etc/apt/apt.conf.d/01devastation-proxy
+  register: devastation_apt_proxy
+
+- name: Check whether devastation apt cache is reachable
+  ansible.builtin.wait_for:
+    host: "apt-cache.{{ devastation_domain }}"
+    port: "{{ apt_cache_port }}"
+    timeout: 2
+  register: devastation_apt_cache_reachable
+  failed_when: false
+  changed_when: false
+  when: devastation_apt_proxy.stat.exists
+
+- name: Temporarily bypass unreachable devastation apt proxy
+  ansible.builtin.command:
+    argv:
+      - mv
+      - /etc/apt/apt.conf.d/01devastation-proxy
+      - /etc/apt/apt.conf.d/01devastation-proxy.disabled-by-devastation-bootstrap
+  when:
+    - devastation_apt_proxy.stat.exists
+    - devastation_apt_cache_reachable.state | default('') != 'started'
+
 - name: Refresh apt metadata
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
+    lock_timeout: "{{ apt_lock_timeout | int }}"
 
 - name: Build base package list
   ansible.builtin.set_fact:
@@ -12,6 +38,7 @@
   ansible.builtin.apt:
     name: "{{ base_packages_effective }}"
     state: present
+    lock_timeout: "{{ apt_lock_timeout | int }}"
 
 - name: Ensure pipx path is available for target user
   ansible.builtin.command: pipx ensurepath

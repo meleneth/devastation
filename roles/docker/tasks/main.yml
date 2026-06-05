@@ -15,7 +15,7 @@
 
 - name: Configure Docker daemon DNS and registry trust posture
   ansible.builtin.template:
-    src: docker-daemon.json.j2
+    src: "{{ playbook_dir }}/../templates/docker-daemon.json.j2"
     dest: /etc/docker/daemon.json
     owner: root
     group: root

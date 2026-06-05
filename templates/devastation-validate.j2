@@ -26,6 +26,8 @@ for host in dns ca registry apt-cache gitlab runner kind grafana jaeger promethe
 done
 
 check "host CA trust" test -f /usr/local/share/ca-certificates/devastation-root-ca.crt || status=1
+check "ephemeral CA private key absent" test ! -e "{{ devastation_paths.ca }}/root-ca.key" || status=1
+check "certificate universe verifies" "{{ ca_rotation_script }}" --verify-only || status=1
 check "Docker running" docker info || status=1
 check "registry reachable" curl -fsS "https://${REGISTRY}/v2/" || status=1
 check "apt cache reachable" curl -fsS "http://apt-cache.${DOMAIN}:{{ apt_cache_port }}/acng-report.html" || status=1

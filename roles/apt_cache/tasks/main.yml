@@ -14,9 +14,15 @@
       - apt-cache
     state: present
 
+- name: Wait for apt cache service
+  ansible.builtin.wait_for:
+    host: "apt-cache.{{ devastation_domain }}"
+    port: "{{ apt_cache_port }}"
+    timeout: 60
+
 - name: Configure host apt to use local cache
   ansible.builtin.template:
-    src: apt-devastation-proxy.conf.j2
+    src: "{{ playbook_dir }}/../templates/apt-devastation-proxy.conf.j2"
     dest: /etc/apt/apt.conf.d/01devastation-proxy
     owner: root
     group: root

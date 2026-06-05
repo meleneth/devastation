@@ -15,7 +15,7 @@
 
 - name: Install MesloLGS Nerd Font files
   ansible.builtin.get_url:
-    url: "https://github.com/ryanoasis/nerd-fonts/raw/{{ meslo_lgs_nerd_font_version }}/patched-fonts/Meslo/S/{{ item | replace(' ', '%20') }}"
+    url: "{{ meslo_lgs_nerd_font_base_url }}/{{ item | replace(' ', '%20') }}"
     dest: "{{ meslo_lgs_nerd_font_dir }}/{{ item }}"
     owner: root
     group: root

@@ -3,6 +3,8 @@
   hosts: localhost
   become: true
   gather_facts: true
+  vars_files:
+    - ../group_vars/all.yml
 
   pre_tasks:
     - name: Assert Debian family host
@@ -31,6 +33,23 @@
         - { path: "{{ devastation_paths.secrets }}", mode: "0700" }
         - { path: "{{ devastation_paths.compose }}", mode: "0755" }
         - { path: "{{ devastation_paths.logs }}", mode: "0755" }
+
+    - name: Add bootstrap deva.station host mappings before apt uses cache proxy
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        marker: "# {mark} DEVASTATION DEVA.STATION HOSTS"
+        block: |
+          {{ devastation_subnets.dns }} dns.{{ devastation_domain }}
+          {{ devastation_subnets.ca }} ca.{{ devastation_domain }}
+          {{ devastation_subnets.registry }} registry.{{ devastation_domain }}
+          {{ devastation_subnets.apt_cache }} apt-cache.{{ devastation_domain }}
+          {{ devastation_subnets.gitlab }} gitlab.{{ devastation_domain }}
+          {{ devastation_subnets.runner }} runner.{{ devastation_domain }}
+          {{ devastation_subnets.kind }} kind.{{ devastation_domain }}
+          {{ devastation_subnets.service_gateway }} grafana.{{ devastation_domain }}
+          {{ devastation_subnets.service_gateway }} jaeger.{{ devastation_domain }}
+          {{ devastation_subnets.service_gateway }} prometheus.{{ devastation_domain }}
+      when: dns_configure_hosts_file
 
   tasks:
     - name: Apply base packages role

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script="${DEVASTATION_CA_ROTATION_SCRIPT:-/usr/local/bin/devastation-rotate-trust-universe}"
+
+if [[ ! -x "$script" ]]; then
+  echo "$script is not installed yet. Run ./bin/devastation-up first."
+  exit 1
+fi
+
+exec sudo "$script" --rotate "$@"

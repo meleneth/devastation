@@ -7,26 +7,91 @@
     group: root
     mode: "0700"
 
-- name: Generate local root CA private key
-  ansible.builtin.command:
-    cmd: "openssl genrsa -out {{ devastation_paths.ca }}/root-ca.key 4096"
-    creates: "{{ devastation_paths.ca }}/root-ca.key"
-
-- name: Protect local root CA key
+- name: Create certificate directory
   ansible.builtin.file:
-    path: "{{ devastation_paths.ca }}/root-ca.key"
+    path: "{{ devastation_paths.certs }}"
+    state: directory
     owner: root
     group: root
-    mode: "0600"
+    mode: "0755"
 
-- name: Generate local root CA certificate
+- name: Install ephemeral CA rotation script
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/devastation-rotate-trust-universe.j2"
+    dest: "{{ ca_rotation_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install NSS certificate tooling for browser trust
+  ansible.builtin.apt:
+    name: libnss3-tools
+    state: present
+  when: ca_install_browser_nss_trust | bool
+
+- name: Check retained root CA certificate
+  ansible.builtin.stat:
+    path: "{{ devastation_paths.ca }}/root-ca.crt"
+  register: ca_root_cert
+
+- name: Check forbidden retained root CA private key
+  ansible.builtin.stat:
+    path: "{{ devastation_paths.ca }}/root-ca.key"
+  register: ca_root_key
+
+- name: Check leaf certificates
+  ansible.builtin.stat:
+    path: "{{ devastation_paths.certs }}/{{ item }}/tls.crt"
+  loop: "{{ ca_leaf_certificates }}"
+  register: ca_leaf_cert_stats
+
+- name: Check leaf private keys
+  ansible.builtin.stat:
+    path: "{{ devastation_paths.certs }}/{{ item }}/tls.key"
+  loop: "{{ ca_leaf_certificates }}"
+  register: ca_leaf_key_stats
+
+- name: Decide whether trust universe rotation is required
+  ansible.builtin.set_fact:
+    ca_rotation_required: >-
+      {{
+        (ca_force_rotate | bool)
+        or ca_root_key.stat.exists
+        or (not ca_root_cert.stat.exists)
+        or ((ca_leaf_cert_stats.results | selectattr('stat.exists', 'equalto', false) | list | length) > 0)
+        or ((ca_leaf_key_stats.results | selectattr('stat.exists', 'equalto', false) | list | length) > 0)
+      }}
+
+- name: Verify existing trust universe before deciding to reuse it
   ansible.builtin.command:
-    cmd: >-
-      openssl req -x509 -new -nodes -key {{ devastation_paths.ca }}/root-ca.key
-      -sha256 -days 3650
-      -subj "/C={{ cert_subject_country }}/O=devastation/CN={{ ca_common_name }}"
-      -out {{ devastation_paths.ca }}/root-ca.crt
-    creates: "{{ devastation_paths.ca }}/root-ca.crt"
+    argv:
+      - "{{ ca_rotation_script }}"
+      - "--verify-only"
+  register: ca_existing_universe_verify
+  changed_when: false
+  failed_when: false
+  when: not (ca_rotation_required | bool)
+
+- name: Rotate when existing trust universe verification fails
+  ansible.builtin.set_fact:
+    ca_rotation_required: true
+  when:
+    - not (ca_rotation_required | bool)
+    - ca_existing_universe_verify.rc != 0
+
+- name: Rotate ephemeral CA trust universe when required
+  ansible.builtin.command:
+    argv:
+      - "{{ ca_rotation_script }}"
+      - "--bootstrap"
+  register: ca_rotation_result
+  changed_when: true
+  when: ca_rotation_required | bool
+
+- name: Show ephemeral CA rotation summary
+  ansible.builtin.debug:
+    var: ca_rotation_result.stdout_lines
+  when: ca_rotation_required | bool
 
 - name: Install local root CA into host trust store
   ansible.builtin.copy:
@@ -39,12 +104,121 @@
   when: ca_install_host_trust
   notify: Update ca certificates
 
-- name: Generate service leaf certificates
-  ansible.builtin.include_tasks: service_cert.yml
-  loop:
-    - "ca.{{ devastation_domain }}"
-    - "registry.{{ devastation_domain }}"
-    - "apt-cache.{{ devastation_domain }}"
-    - "gitlab.{{ devastation_domain }}"
-  loop_control:
-    loop_var: cert_name
+- name: Ensure user NSS database directory exists
+  ansible.builtin.file:
+    path: "{{ user_setup_home }}/.pki/nssdb"
+    state: directory
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0700"
+  when: ca_install_browser_nss_trust | bool
+
+- name: Check shared user NSS database
+  ansible.builtin.stat:
+    path: "{{ user_setup_home }}/.pki/nssdb/cert9.db"
+  register: user_nss_db
+  when: ca_install_browser_nss_trust | bool
+
+- name: Initialize shared user NSS database
+  ansible.builtin.command:
+    argv:
+      - certutil
+      - -N
+      - -d
+      - "sql:{{ user_setup_home }}/.pki/nssdb"
+      - --empty-password
+    creates: "{{ user_setup_home }}/.pki/nssdb/cert9.db"
+  become: true
+  become_user: "{{ devastation_user }}"
+  when:
+    - ca_install_browser_nss_trust | bool
+    - not user_nss_db.stat.exists
+
+- name: Check local root CA in shared user NSS database
+  ansible.builtin.command:
+    argv:
+      - certutil
+      - -L
+      - -d
+      - "sql:{{ user_setup_home }}/.pki/nssdb"
+      - -n
+      - "{{ ca_nss_cert_name }}"
+  become: true
+  become_user: "{{ devastation_user }}"
+  register: user_nss_ca
+  changed_when: false
+  failed_when: false
+  when: ca_install_browser_nss_trust | bool
+
+- name: Install local root CA into shared user NSS database
+  ansible.builtin.command:
+    argv:
+      - certutil
+      - -A
+      - -d
+      - "sql:{{ user_setup_home }}/.pki/nssdb"
+      - -n
+      - "{{ ca_nss_cert_name }}"
+      - -t
+      - "C,,"
+      - -i
+      - /usr/local/share/ca-certificates/devastation-root-ca.crt
+  become: true
+  become_user: "{{ devastation_user }}"
+  when:
+    - ca_install_browser_nss_trust | bool
+    - user_nss_ca.rc != 0
+
+- name: Find Firefox NSS databases
+  ansible.builtin.find:
+    paths: "{{ user_setup_home }}/.mozilla/firefox"
+    patterns: cert9.db
+    recurse: true
+    file_type: file
+  register: firefox_nss_dbs
+  failed_when: false
+  when: ca_install_browser_nss_trust | bool
+
+- name: Check local root CA in Firefox NSS databases
+  ansible.builtin.command:
+    argv:
+      - certutil
+      - -L
+      - -d
+      - "sql:{{ item.path | dirname }}"
+      - -n
+      - "{{ ca_nss_cert_name }}"
+  become: true
+  become_user: "{{ devastation_user }}"
+  loop: "{{ firefox_nss_dbs.files | default([]) }}"
+  register: firefox_nss_ca
+  changed_when: false
+  failed_when: false
+  when: ca_install_browser_nss_trust | bool
+
+- name: Install local root CA into Firefox NSS databases
+  ansible.builtin.command:
+    argv:
+      - certutil
+      - -A
+      - -d
+      - "sql:{{ item.item.path | dirname }}"
+      - -n
+      - "{{ ca_nss_cert_name }}"
+      - -t
+      - "C,,"
+      - -i
+      - /usr/local/share/ca-certificates/devastation-root-ca.crt
+  become: true
+  become_user: "{{ devastation_user }}"
+  loop: "{{ firefox_nss_ca.results | default([]) }}"
+  when:
+    - ca_install_browser_nss_trust | bool
+    - item.rc != 0
+
+- name: Verify ephemeral CA trust universe
+  ansible.builtin.command:
+    argv:
+      - "{{ ca_rotation_script }}"
+      - "--verify-only"
+  changed_when: false
