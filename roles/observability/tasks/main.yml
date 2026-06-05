@@ -73,6 +73,14 @@
     group: root
     mode: "0644"
 
+- name: Install Grafana Node Exporter Full dashboard
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../files/grafana-dashboard-node-exporter-full.json"
+    dest: "{{ devastation_paths.observability }}/grafana/dashboards/node-exporter-full.json"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Start observability services
   community.docker.docker_compose_v2:
     project_src: "{{ devastation_paths.compose }}"

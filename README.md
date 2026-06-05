@@ -248,7 +248,7 @@ The compose project includes local dev data services and an observability stack:
 - Loki: `http://loki.deva.station:3100`
 - OTLP collector endpoint: `otel-collector.deva.station:4317` for gRPC and `:4318` for HTTP
 
-Grafana is provisioned with Prometheus, Loki, Jaeger, and all four Postgres databases as data sources. Starter dashboards are generated under `/srv/devastation/observability/grafana/dashboards`, including a system overview and database dashboard. Prometheus scrapes Prometheus itself, node-exporter, cAdvisor, both registry metrics endpoints, Grafana, Loki, Vault, OTel Collector internal metrics, OTel Collector pipeline metrics, and Postgres exporters for every database container.
+Grafana is provisioned with Prometheus, Loki, Jaeger, and all four Postgres databases as data sources. Dashboards are generated under `/srv/devastation/observability/grafana/dashboards`, including a system overview, database dashboard, and the widely used Grafana.com `Node Exporter Full` host monitoring dashboard, ID `1860`. Prometheus scrapes Prometheus itself, node-exporter, cAdvisor, both registry metrics endpoints, Grafana, Loki, Vault, OTel Collector internal metrics, OTel Collector pipeline metrics, and Postgres exporters for every database container.
 
 The OTel Collector receives OTLP over gRPC and HTTP, then exports traces to Jaeger and logs to Loki. The `otel-db` Postgres container is included as a Grafana datasource so experiments that need an observability-owned database have a reserved target from day one.
 
