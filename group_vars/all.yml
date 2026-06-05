@@ -13,7 +13,11 @@ devastation_subnets:
   gitlab: 172.30.42.14
   runner: 172.30.42.15
   registry_cache: 172.30.42.16
+  otel_collector: 172.30.42.17
+  prometheus: 172.30.42.18
+  jaeger: 172.30.42.19
   kind: 172.30.42.20
+  grafana: 172.30.42.21
 
 devastation_dns_records:
   - name: "dns.{{ devastation_domain }}"
@@ -32,12 +36,14 @@ devastation_dns_records:
     ip: "{{ devastation_subnets.runner }}"
   - name: "kind.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.kind }}"
+  - name: "otel-collector.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.otel_collector }}"
   - name: "grafana.{{ devastation_domain }}"
-    ip: "{{ devastation_subnets.service_gateway }}"
+    ip: "{{ devastation_subnets.grafana }}"
   - name: "jaeger.{{ devastation_domain }}"
-    ip: "{{ devastation_subnets.service_gateway }}"
+    ip: "{{ devastation_subnets.jaeger }}"
   - name: "prometheus.{{ devastation_domain }}"
-    ip: "{{ devastation_subnets.service_gateway }}"
+    ip: "{{ devastation_subnets.prometheus }}"
 
 devastation_internal_hostnames:
   - "dns.{{ devastation_domain }}"
@@ -48,6 +54,7 @@ devastation_internal_hostnames:
   - "gitlab.{{ devastation_domain }}"
   - "runner.{{ devastation_domain }}"
   - "kind.{{ devastation_domain }}"
+  - "otel-collector.{{ devastation_domain }}"
   - "grafana.{{ devastation_domain }}"
   - "jaeger.{{ devastation_domain }}"
   - "prometheus.{{ devastation_domain }}"

@@ -83,6 +83,7 @@ These names are served under `deva.station`:
 - `gitlab.deva.station`
 - `runner.deva.station`
 - `kind.deva.station`
+- `otel-collector.deva.station`, reserved
 - `grafana.deva.station`, reserved
 - `jaeger.deva.station`, reserved
 - `prometheus.deva.station`, reserved
