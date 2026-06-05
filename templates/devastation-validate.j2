@@ -4,6 +4,10 @@ set -euo pipefail
 DOMAIN="{{ devastation_domain }}"
 REGISTRY="registry.${DOMAIN}"
 QUICK=0
+CHECK_TMP="$(mktemp -d)"
+CHECK_OUT="${CHECK_TMP}/check.out"
+trap 'rm -rf "$CHECK_TMP"' EXIT
+
 if [[ "${1:-}" == "--quick" ]]; then
   QUICK=1
 fi
@@ -11,11 +15,22 @@ fi
 check() {
   local name="$1"
   shift
-  if "$@" >/tmp/devastation-check.out 2>&1; then
+  if "$@" >"$CHECK_OUT" 2>&1; then
     printf '[ok] %s\n' "$name"
   else
     printf '[fail] %s\n' "$name"
-    sed 's/^/  /' /tmp/devastation-check.out
+    sed 's/^/  /' "$CHECK_OUT"
+    return 1
+  fi
+}
+
+run_root() {
+  if [[ "${EUID}" == "0" ]]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo -n "$@"
+  else
+    printf 'root privileges required for: %s\n' "$*" >&2
     return 1
   fi
 }
@@ -26,8 +41,8 @@ for fqdn in{% for record in devastation_dns_records %} {{ record.name }}{% endfo
 done
 
 check "host CA trust" test -f /usr/local/share/ca-certificates/devastation-root-ca.crt || status=1
-check "ephemeral CA private key absent" test ! -e "{{ devastation_paths.ca }}/root-ca.key" || status=1
-check "certificate universe verifies" "{{ ca_rotation_script }}" --verify-only || status=1
+check "ephemeral CA private key absent" run_root test ! -e "{{ devastation_paths.ca }}/root-ca.key" || status=1
+check "certificate universe verifies" run_root "{{ ca_rotation_script }}" --verify-only || status=1
 check "Docker running" docker info || status=1
 check "registry reachable" curl -fsS "https://${REGISTRY}/v2/" || status=1
 check "registry metrics reachable" curl -fsS "http://${REGISTRY}:{{ registry_metrics_port }}/metrics" || status=1
