@@ -54,6 +54,8 @@ Bring the environment up:
 ./bin/devastation-up
 ```
 
+On success, `devastation-up` opens [Devastation Home](http://www.deva.station). Set `DEVASTATION_OPEN_HOME=0` to only print the URL.
+
 Run full validation:
 
 ```bash

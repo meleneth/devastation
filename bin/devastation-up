@@ -27,3 +27,23 @@ if [[ "$needs_become_prompt" == "1" ]]; then
 fi
 
 ansible-playbook playbooks/bootstrap.yml "${args[@]}"
+
+home_url="${DEVASTATION_HOME_URL:-http://www.deva.station}"
+open_home="${DEVASTATION_OPEN_HOME:-1}"
+
+if [[ "$open_home" == "1" ]]; then
+  if command -v xdg-open >/dev/null 2>&1; then
+    nohup xdg-open "$home_url" >/dev/null 2>&1 &
+    printf 'Opened %s\n' "$home_url"
+  elif command -v sensible-browser >/dev/null 2>&1; then
+    nohup sensible-browser "$home_url" >/dev/null 2>&1 &
+    printf 'Opened %s\n' "$home_url"
+  elif command -v gio >/dev/null 2>&1; then
+    nohup gio open "$home_url" >/dev/null 2>&1 &
+    printf 'Opened %s\n' "$home_url"
+  else
+    printf 'Devastation home: %s\n' "$home_url"
+  fi
+else
+  printf 'Devastation home: %s\n' "$home_url"
+fi
