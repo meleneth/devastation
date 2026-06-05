@@ -31,6 +31,12 @@ LEAF_CERTS=(
 {% endfor %}
 )
 
+BROWSER_NSS_DBS=(
+{% for nss_db in ca_browser_nss_db_paths %}
+  "{{ nss_db }}"
+{% endfor %}
+)
+
 log() {
   printf '[devastation-ca] %s\n' "$*"
 }
@@ -217,12 +223,14 @@ install_nss_trust() {
     log "certutil not found; skipping browser NSS trust"
     return 0
   fi
-  local user_nss="${USER_HOME}/.pki/nssdb"
-  install -d -m 0700 -o "$USER_NAME" -g "$USER_NAME" "$user_nss"
-  if [[ ! -f "${user_nss}/cert9.db" ]]; then
-    run_as_devastation_user certutil -N -d "sql:${user_nss}" --empty-password
-  fi
-  run_as_devastation_user bash -c "$(declare -f install_nss_trust_one_db); CA_NSS_NAME='$CA_NSS_NAME'; PUBLIC_CA_CERT='$PUBLIC_CA_CERT'; install_nss_trust_one_db '$user_nss'"
+  local user_nss
+  for user_nss in "${BROWSER_NSS_DBS[@]}"; do
+    install -d -m 0700 -o "$USER_NAME" -g "$USER_NAME" "$user_nss"
+    if [[ ! -f "${user_nss}/cert9.db" ]]; then
+      run_as_devastation_user certutil -N -d "sql:${user_nss}" --empty-password
+    fi
+    run_as_devastation_user bash -c "$(declare -f install_nss_trust_one_db); CA_NSS_NAME='$CA_NSS_NAME'; PUBLIC_CA_CERT='$PUBLIC_CA_CERT'; install_nss_trust_one_db '$user_nss'"
+  done
 
   local firefox_root="${USER_HOME}/.mozilla/firefox"
   if [[ -d "$firefox_root" ]]; then
@@ -263,7 +271,7 @@ restart_affected_services() {
     systemctl restart docker >/dev/null 2>&1 || true
   fi
   if [[ -f "$COMPOSE_FILE" ]] && command -v docker >/dev/null 2>&1; then
-    docker compose -f "$COMPOSE_FILE" restart registry gitlab gitlab-runner >/dev/null 2>&1 || true
+    docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps registry gitlab gitlab-runner >/dev/null 2>&1 || true
   fi
 }
 

@@ -12,12 +12,38 @@ devastation_subnets:
   apt_cache: 172.30.42.13
   gitlab: 172.30.42.14
   runner: 172.30.42.15
+  registry_cache: 172.30.42.16
   kind: 172.30.42.20
+
+devastation_dns_records:
+  - name: "dns.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.dns }}"
+  - name: "ca.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.ca }}"
+  - name: "registry.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.registry }}"
+  - name: "registry-cache.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.registry_cache }}"
+  - name: "apt-cache.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.apt_cache }}"
+  - name: "gitlab.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.gitlab }}"
+  - name: "runner.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.runner }}"
+  - name: "kind.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.kind }}"
+  - name: "grafana.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.service_gateway }}"
+  - name: "jaeger.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.service_gateway }}"
+  - name: "prometheus.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.service_gateway }}"
 
 devastation_internal_hostnames:
   - "dns.{{ devastation_domain }}"
   - "ca.{{ devastation_domain }}"
   - "registry.{{ devastation_domain }}"
+  - "registry-cache.{{ devastation_domain }}"
   - "apt-cache.{{ devastation_domain }}"
   - "gitlab.{{ devastation_domain }}"
   - "runner.{{ devastation_domain }}"
@@ -122,6 +148,9 @@ dns_systemd_resolved_dropin: /etc/systemd/resolved.conf.d/devastation.conf
 ca_install_host_trust: true
 ca_install_browser_nss_trust: true
 ca_nss_cert_name: "Devastation Local Root CA"
+ca_browser_nss_db_paths:
+  - "{{ user_setup_home }}/.local/share/pki/nssdb"
+  - "{{ user_setup_home }}/.pki/nssdb"
 ca_common_name: "Devastation Local Root CA"
 ca_ephemeral_root: true
 ca_force_rotate: false

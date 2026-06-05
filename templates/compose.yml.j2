@@ -49,7 +49,8 @@ services:
     ports:
       - "5001:5000"
     networks:
-      - devastation
+      devastation:
+        ipv4_address: {{ devastation_subnets.registry_cache }}
 {% endif %}
 
   apt-cache:
@@ -74,8 +75,8 @@ services:
         gitlab_rails['gitlab_shell_ssh_port'] = {{ gitlab_ssh_port }}
         nginx['listen_port'] = 443
         nginx['listen_https'] = true
-        nginx['ssl_certificate'] = "/etc/gitlab/ssl/gitlab.{{ devastation_domain }}.crt"
-        nginx['ssl_certificate_key'] = "/etc/gitlab/ssl/gitlab.{{ devastation_domain }}.key"
+        nginx['ssl_certificate'] = "/devastation-certs/gitlab/tls.crt"
+        nginx['ssl_certificate_key'] = "/devastation-certs/gitlab/tls.key"
         registry_external_url nil
     ports:
       - "{{ gitlab_http_port }}:80"
@@ -85,8 +86,7 @@ services:
       - {{ devastation_paths.gitlab }}/config:/etc/gitlab
       - {{ devastation_paths.gitlab }}/logs:/var/log/gitlab
       - {{ devastation_paths.gitlab }}/data:/var/opt/gitlab
-      - {{ devastation_paths.certs }}/gitlab.{{ devastation_domain }}/tls.crt:/etc/gitlab/ssl/gitlab.{{ devastation_domain }}.crt:ro
-      - {{ devastation_paths.certs }}/gitlab.{{ devastation_domain }}/tls.key:/etc/gitlab/ssl/gitlab.{{ devastation_domain }}.key:ro
+      - {{ devastation_paths.certs }}/gitlab.{{ devastation_domain }}:/devastation-certs/gitlab:ro
     networks:
       devastation:
         ipv4_address: {{ devastation_subnets.gitlab }}

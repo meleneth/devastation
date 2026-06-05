@@ -21,8 +21,8 @@ check() {
 }
 
 status=0
-for host in dns ca registry apt-cache gitlab runner kind grafana jaeger prometheus; do
-  check "dns ${host}.${DOMAIN}" getent hosts "${host}.${DOMAIN}" || status=1
+for fqdn in{% for record in devastation_dns_records %} {{ record.name }}{% endfor %}; do
+  check "dns ${fqdn}" getent hosts "${fqdn}" || status=1
 done
 
 check "host CA trust" test -f /usr/local/share/ca-certificates/devastation-root-ca.crt || status=1

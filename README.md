@@ -78,6 +78,7 @@ These names are served under `deva.station`:
 - `dns.deva.station`
 - `ca.deva.station`
 - `registry.deva.station`
+- `registry-cache.deva.station`
 - `apt-cache.deva.station`
 - `gitlab.deva.station`
 - `runner.deva.station`
@@ -88,7 +89,7 @@ These names are served under `deva.station`:
 
 ## Registry
 
-The canonical local Kubernetes registry is `registry.deva.station` over HTTPS with the local root CA. Host Docker trusts the CA through `/etc/docker/certs.d/registry.deva.station/ca.crt`; KIND nodes receive `/etc/containerd/certs.d/registry.deva.station/hosts.toml` and the CA certificate.
+The canonical local Kubernetes registry is `registry.deva.station` over HTTPS with the local root CA. The pull-through Docker Hub cache is `registry-cache.deva.station`. Host Docker trusts the CA through `/etc/docker/certs.d/registry.deva.station/ca.crt`; KIND nodes receive `/etc/containerd/certs.d/registry.deva.station/hosts.toml` and the CA certificate.
 
 Acceptance flow:
 
@@ -127,7 +128,7 @@ If a package is unavailable offline, apt will fail clearly. Refresh the cache wh
 
 ## DNS Notes
 
-CoreDNS runs in Docker and binds `127.0.0.1:53` for host access. Ansible also writes static `deva.station` entries to `/etc/hosts` by default so browser and CLI access work even on systems without `systemd-resolved`. If `systemd-resolved` is present, Ansible configures a drop-in at `/etc/systemd/resolved.conf.d/devastation.conf`, using split DNS for `deva.station`.
+CoreDNS runs in Docker and binds `127.0.0.1:53` for host access. Service names are mapped to fixed addresses on the private Docker bridge defined by `devastation_subnets.services`, defaulting to `172.30.42.0/24`; the `devastation_dns_records` list is the source of truth for CoreDNS and `/etc/hosts`. Ansible also writes static `deva.station` entries to `/etc/hosts` by default so browser and CLI access work even on systems without `systemd-resolved`. If `systemd-resolved` is present, Ansible configures a drop-in at `/etc/systemd/resolved.conf.d/devastation.conf`, using split DNS for `deva.station`.
 
 Rollback:
 
@@ -157,7 +158,7 @@ Destroyed artifacts:
 - OpenSSL serial and config scratch files
 - any legacy `/srv/devastation/ca/root-ca.key`
 
-The root certificate is installed into host trust when `ca_install_host_trust: true`. The CA role also installs the root into the target user's NSS trust databases when `ca_install_browser_nss_trust: true`, covering Chromium-style `~/.pki/nssdb` trust and existing Firefox profiles under `~/.mozilla/firefox`. Docker receives registry trust under `/etc/docker/certs.d/registry.deva.station/ca.crt`; KIND nodes receive containerd trust when they exist; GitLab Runner sees the retained root certificate through its mounted config.
+The root certificate is installed into host trust when `ca_install_host_trust: true`. The CA role also installs the root into the target user's NSS trust databases when `ca_install_browser_nss_trust: true`, covering current Chromium-style `~/.local/share/pki/nssdb` trust, legacy `~/.pki/nssdb` trust, and existing Firefox profiles under `~/.mozilla/firefox`. Docker receives registry trust under `/etc/docker/certs.d/registry.deva.station/ca.crt`; KIND nodes receive containerd trust when they exist; GitLab Runner sees the retained root certificate through its mounted config.
 
 After rerunning the playbook, restart your browser before checking `https://gitlab.deva.station`. If Firefox creates a new profile later, rerun `./bin/devastation-up` to add the root CA to that new profile.
 

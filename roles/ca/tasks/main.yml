@@ -106,57 +106,90 @@
 
 - name: Ensure user NSS database directory exists
   ansible.builtin.file:
-    path: "{{ user_setup_home }}/.pki/nssdb"
+    path: "{{ item }}"
     state: directory
     owner: "{{ devastation_user }}"
     group: "{{ devastation_user }}"
     mode: "0700"
+  loop: "{{ ca_browser_nss_db_paths }}"
   when: ca_install_browser_nss_trust | bool
 
-- name: Check shared user NSS database
+- name: Check browser NSS databases
   ansible.builtin.stat:
-    path: "{{ user_setup_home }}/.pki/nssdb/cert9.db"
-  register: user_nss_db
+    path: "{{ item }}/cert9.db"
+  loop: "{{ ca_browser_nss_db_paths }}"
+  register: browser_nss_dbs
   when: ca_install_browser_nss_trust | bool
 
-- name: Initialize shared user NSS database
+- name: Initialize browser NSS databases
   ansible.builtin.command:
     argv:
       - certutil
       - -N
       - -d
-      - "sql:{{ user_setup_home }}/.pki/nssdb"
+      - "sql:{{ item.item }}"
       - --empty-password
-    creates: "{{ user_setup_home }}/.pki/nssdb/cert9.db"
+    creates: "{{ item.item }}/cert9.db"
   become: true
   become_user: "{{ devastation_user }}"
+  loop: "{{ browser_nss_dbs.results | default([]) }}"
   when:
     - ca_install_browser_nss_trust | bool
-    - not user_nss_db.stat.exists
+    - not item.stat.exists
 
-- name: Check local root CA in shared user NSS database
+- name: Get current public root CA fingerprint
   ansible.builtin.command:
     argv:
-      - certutil
-      - -L
-      - -d
-      - "sql:{{ user_setup_home }}/.pki/nssdb"
-      - -n
-      - "{{ ca_nss_cert_name }}"
+      - openssl
+      - x509
+      - -in
+      - /usr/local/share/ca-certificates/devastation-root-ca.crt
+      - -noout
+      - -fingerprint
+      - -sha256
+  register: ca_public_root_fingerprint
+  changed_when: false
+  when: ca_install_browser_nss_trust | bool
+
+- name: Get browser NSS root CA fingerprints
+  ansible.builtin.shell: >-
+    certutil -L -d sql:{{ item | quote }} -n {{ ca_nss_cert_name | quote }} -a
+    | openssl x509 -noout -fingerprint -sha256
+  args:
+    executable: /bin/bash
   become: true
   become_user: "{{ devastation_user }}"
-  register: user_nss_ca
+  loop: "{{ ca_browser_nss_db_paths }}"
+  register: browser_nss_ca_fingerprints
   changed_when: false
   failed_when: false
   when: ca_install_browser_nss_trust | bool
 
-- name: Install local root CA into shared user NSS database
+- name: Remove stale local root CA from browser NSS databases
+  ansible.builtin.command:
+    argv:
+      - certutil
+      - -D
+      - -d
+      - "sql:{{ item.item }}"
+      - -n
+      - "{{ ca_nss_cert_name }}"
+  become: true
+  become_user: "{{ devastation_user }}"
+  loop: "{{ browser_nss_ca_fingerprints.results | default([]) }}"
+  failed_when: false
+  when:
+    - ca_install_browser_nss_trust | bool
+    - item.rc == 0
+    - item.stdout != ca_public_root_fingerprint.stdout
+
+- name: Install current local root CA into browser NSS databases
   ansible.builtin.command:
     argv:
       - certutil
       - -A
       - -d
-      - "sql:{{ user_setup_home }}/.pki/nssdb"
+      - "sql:{{ item }}"
       - -n
       - "{{ ca_nss_cert_name }}"
       - -t
@@ -165,9 +198,10 @@
       - /usr/local/share/ca-certificates/devastation-root-ca.crt
   become: true
   become_user: "{{ devastation_user }}"
+  loop: "{{ browser_nss_ca_fingerprints.results | default([]) }}"
   when:
     - ca_install_browser_nss_trust | bool
-    - user_nss_ca.rc != 0
+    - item.rc != 0 or item.stdout != ca_public_root_fingerprint.stdout
 
 - name: Find Firefox NSS databases
   ansible.builtin.find:
