@@ -257,7 +257,7 @@ The compose project includes local dev data services and an observability stack:
 
 Grafana is provisioned with Prometheus, Loki, Jaeger, and all four Postgres databases as data sources. Dashboards are generated under `/srv/devastation/observability/grafana/dashboards`, including a system overview, database dashboard, and the widely used Grafana.com `Node Exporter Full` host monitoring dashboard, ID `1860`. Prometheus scrapes Prometheus itself, node-exporter, cAdvisor, both registry metrics endpoints, Grafana, Loki, Vault, OTel Collector internal metrics, OTel Collector pipeline metrics, and Postgres exporters for every database container.
 
-The OTel Collector receives OTLP over gRPC and HTTP, then exports traces to Jaeger and logs to Loki. The `otel-db` Postgres container is included as a Grafana datasource so experiments that need an observability-owned database have a reserved target from day one.
+The OTel Collector receives OTLP over gRPC and HTTP, receives `www` nginx container logs over Docker's fluentd logging driver, then exports traces to Jaeger and logs to Loki. The `otel-db` Postgres container is included as a Grafana datasource so experiments that need an observability-owned database have a reserved target from day one.
 
 MinIO is pinned to a known community image tag because current MinIO community image publishing is in flux; use `minio_image` to swap in a preferred fork or enterprise image.
 

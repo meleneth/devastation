@@ -1,4 +1,7 @@
 receivers:
+  fluent_forward/www:
+    endpoint: 0.0.0.0:{{ otel_fluentforward_port }}
+
   otlp:
     protocols:
       grpc:
@@ -43,6 +46,6 @@ service:
       processors: [batch]
       exporters: [prometheus, debug]
     logs:
-      receivers: [otlp]
+      receivers: [otlp, fluent_forward/www]
       processors: [batch]
       exporters: [otlphttp/loki, debug]

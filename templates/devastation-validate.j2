@@ -87,6 +87,7 @@ check "Grafana reachable" curl -fsS "http://grafana.${DOMAIN}:{{ grafana_port }}
 check "Jaeger reachable" curl -fsS "http://jaeger.${DOMAIN}:{{ jaeger_ui_port }}/" || status=1
 retry_check "Loki reachable" 24 5 curl -fsS "http://loki.${DOMAIN}:{{ loki_port }}/ready" || status=1
 check "OTel Collector metrics reachable" curl -fsS "http://otel-collector.${DOMAIN}:8888/metrics" || status=1
+check "OTel Collector Fluent Forward reachable" nc -z "otel-collector.${DOMAIN}" {{ otel_fluentforward_port }} || status=1
 {% for pg in postgres_databases %}
 check "{{ pg.service }} reachable" nc -z "{{ pg.hostname }}" 5432 || status=1
 {% endfor %}
