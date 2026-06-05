@@ -1,0 +1,87 @@
+---
+- name: Create observability directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ devastation_paths.observability }}/prometheus", mode: "0755" }
+    - { path: "{{ devastation_paths.observability }}/prometheus/data", mode: "0777" }
+    - { path: "{{ devastation_paths.observability }}/loki", mode: "0755" }
+    - { path: "{{ devastation_paths.observability }}/loki/data", mode: "0777" }
+    - { path: "{{ devastation_paths.observability }}/otel-collector", mode: "0755" }
+    - { path: "{{ devastation_paths.observability }}/grafana/data", mode: "0777" }
+    - { path: "{{ devastation_paths.observability }}/grafana/provisioning/datasources", mode: "0755" }
+    - { path: "{{ devastation_paths.observability }}/grafana/provisioning/dashboards", mode: "0755" }
+    - { path: "{{ devastation_paths.observability }}/grafana/dashboards", mode: "0755" }
+
+- name: Write Prometheus configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/prometheus.yml.j2"
+    dest: "{{ devastation_paths.observability }}/prometheus/prometheus.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write Loki configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/loki-config.yaml.j2"
+    dest: "{{ devastation_paths.observability }}/loki/loki-config.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write OTel Collector configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/otel-collector-config.yaml.j2"
+    dest: "{{ devastation_paths.observability }}/otel-collector/config.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write Grafana datasource provisioning
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/grafana-datasources.yml.j2"
+    dest: "{{ devastation_paths.observability }}/grafana/provisioning/datasources/devastation.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write Grafana dashboard provider
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/grafana-dashboards.yml.j2"
+    dest: "{{ devastation_paths.observability }}/grafana/provisioning/dashboards/devastation.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write Grafana overview dashboard
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/grafana-dashboard-devastation-overview.json.j2"
+    dest: "{{ devastation_paths.observability }}/grafana/dashboards/devastation-overview.json"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write Grafana database dashboard
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/grafana-dashboard-devastation-databases.json.j2"
+    dest: "{{ devastation_paths.observability }}/grafana/dashboards/devastation-databases.json"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Start observability services
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - loki
+      - jaeger
+      - otel-collector
+      - prometheus
+      - grafana
+      - node-exporter
+      - cadvisor
+    state: present

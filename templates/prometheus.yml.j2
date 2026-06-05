@@ -1,0 +1,52 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  - job_name: registry
+    static_configs:
+      - targets:
+          - "registry:{{ registry_metrics_port }}"
+          - "registry-cache:{{ registry_metrics_port }}"
+
+  - job_name: grafana
+    static_configs:
+      - targets: ["grafana:3000"]
+
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
+
+  - job_name: otel-collector
+    static_configs:
+      - targets:
+          - "otel-collector:8888"
+          - "otel-collector:9464"
+
+  - job_name: vault
+    metrics_path: /v1/sys/metrics
+    params:
+      format: ["prometheus"]
+    authorization:
+      credentials: "{{ vault_dev_root_token }}"
+    static_configs:
+      - targets: ["vault:{{ vault_port }}"]
+
+{% for pg in postgres_databases %}
+  - job_name: postgres-{{ pg.service }}
+    static_configs:
+      - targets: ["{{ pg.service }}-exporter:9187"]
+
+{% endfor %}

@@ -32,6 +32,9 @@
         - { path: "{{ devastation_paths.ca }}", mode: "0700" }
         - { path: "{{ devastation_paths.secrets }}", mode: "0700" }
         - { path: "{{ devastation_paths.compose }}", mode: "0755" }
+        - { path: "{{ devastation_paths.observability }}", mode: "0755" }
+        - { path: "{{ devastation_paths.vault }}", mode: "0755" }
+        - { path: "{{ devastation_paths.postgres }}", mode: "0755" }
         - { path: "{{ devastation_paths.logs }}", mode: "0755" }
 
     - name: Add bootstrap deva.station host mappings before apt uses cache proxy
@@ -95,6 +98,14 @@
     - name: Apply KIND role
       ansible.builtin.import_role:
         name: kind
+
+    - name: Apply datastore role
+      ansible.builtin.import_role:
+        name: datastores
+
+    - name: Apply observability role
+      ansible.builtin.import_role:
+        name: observability
 
     - name: Apply GitLab role
       ansible.builtin.import_role:

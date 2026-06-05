@@ -30,7 +30,17 @@ check "ephemeral CA private key absent" test ! -e "{{ devastation_paths.ca }}/ro
 check "certificate universe verifies" "{{ ca_rotation_script }}" --verify-only || status=1
 check "Docker running" docker info || status=1
 check "registry reachable" curl -fsS "https://${REGISTRY}/v2/" || status=1
+check "registry metrics reachable" curl -fsS "http://${REGISTRY}:{{ registry_metrics_port }}/metrics" || status=1
 check "apt cache reachable" curl -fsS "http://apt-cache.${DOMAIN}:{{ apt_cache_port }}/acng-report.html" || status=1
+check "Vault reachable" curl -fsS "http://vault.${DOMAIN}:{{ vault_port }}/v1/sys/health" || status=1
+check "Prometheus reachable" curl -fsS "http://prometheus.${DOMAIN}:{{ prometheus_port }}/-/ready" || status=1
+check "Grafana reachable" curl -fsS "http://grafana.${DOMAIN}:{{ grafana_port }}/api/health" || status=1
+check "Jaeger reachable" curl -fsS "http://jaeger.${DOMAIN}:{{ jaeger_ui_port }}/" || status=1
+check "Loki reachable" curl -fsS "http://loki.${DOMAIN}:{{ loki_port }}/ready" || status=1
+check "OTel Collector metrics reachable" curl -fsS "http://otel-collector.${DOMAIN}:8888/metrics" || status=1
+{% for pg in postgres_databases %}
+check "{{ pg.service }} reachable" nc -z "{{ pg.hostname }}" 5432 || status=1
+{% endfor %}
 check "KIND cluster listed" kind get clusters || status=1
 check "kubectl cluster-info" kubectl cluster-info || status=1
 check "GitLab web reachable" curl -kfsS "{{ gitlab_external_url }}/-/health" || status=1

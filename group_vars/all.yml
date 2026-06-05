@@ -18,6 +18,14 @@ devastation_subnets:
   jaeger: 172.30.42.19
   kind: 172.30.42.20
   grafana: 172.30.42.21
+  loki: 172.30.42.22
+  node_exporter: 172.30.42.23
+  cadvisor: 172.30.42.24
+  vault: 172.30.42.25
+  test_db: 172.30.42.31
+  development_db: 172.30.42.32
+  production_db: 172.30.42.33
+  otel_db: 172.30.42.34
 
 devastation_dns_records:
   - name: "dns.{{ devastation_domain }}"
@@ -44,6 +52,22 @@ devastation_dns_records:
     ip: "{{ devastation_subnets.jaeger }}"
   - name: "prometheus.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.prometheus }}"
+  - name: "loki.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.loki }}"
+  - name: "node-exporter.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.node_exporter }}"
+  - name: "cadvisor.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.cadvisor }}"
+  - name: "vault.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.vault }}"
+  - name: "test-db.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.test_db }}"
+  - name: "development-db.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.development_db }}"
+  - name: "production-db.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.production_db }}"
+  - name: "otel-db.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.otel_db }}"
 
 devastation_internal_hostnames:
   - "dns.{{ devastation_domain }}"
@@ -58,6 +82,14 @@ devastation_internal_hostnames:
   - "grafana.{{ devastation_domain }}"
   - "jaeger.{{ devastation_domain }}"
   - "prometheus.{{ devastation_domain }}"
+  - "loki.{{ devastation_domain }}"
+  - "node-exporter.{{ devastation_domain }}"
+  - "cadvisor.{{ devastation_domain }}"
+  - "vault.{{ devastation_domain }}"
+  - "test-db.{{ devastation_domain }}"
+  - "development-db.{{ devastation_domain }}"
+  - "production-db.{{ devastation_domain }}"
+  - "otel-db.{{ devastation_domain }}"
 
 devastation_paths:
   certs: "{{ devastation_root }}/certs"
@@ -70,6 +102,9 @@ devastation_paths:
   kind: "{{ devastation_root }}/kind"
   gitlab: "{{ devastation_root }}/gitlab"
   gitlab_runner: "{{ devastation_root }}/gitlab-runner"
+  observability: "{{ devastation_root }}/observability"
+  vault: "{{ devastation_root }}/vault"
+  postgres: "{{ devastation_root }}/postgres"
   logs: "{{ devastation_root }}/logs"
 
 base_packages_extra: []
@@ -175,6 +210,7 @@ registry_enable_auth: false
 registry_htpasswd_user: devastation
 registry_pull_through_cache_enabled: true
 registry_pull_through_remoteurl: https://registry-1.docker.io
+registry_metrics_port: 5001
 
 apt_cache_port: 3142
 apt_cache_configure_host: true
@@ -219,5 +255,52 @@ gitlab_runner_executor: docker
 gitlab_runner_docker_image: docker:27
 gitlab_runner_mount_docker_socket: false
 gitlab_runner_tags: "local,devastation,docker"
+
+postgres_version: "18.4"
+postgres_default_user: devastation
+postgres_default_password: devastation
+postgres_databases:
+  - service: test-db
+    hostname: "test-db.{{ devastation_domain }}"
+    subnet_key: test_db
+    database: test_db
+    host_port: 5433
+  - service: development-db
+    hostname: "development-db.{{ devastation_domain }}"
+    subnet_key: development_db
+    database: development_db
+    host_port: 5434
+  - service: production-db
+    hostname: "production-db.{{ devastation_domain }}"
+    subnet_key: production_db
+    database: production_db
+    host_port: 5435
+  - service: otel-db
+    hostname: "otel-db.{{ devastation_domain }}"
+    subnet_key: otel_db
+    database: otel_db
+    host_port: 5436
+
+vault_version: "1.19.5"
+vault_dev_root_token: devastation
+vault_port: 8200
+
+grafana_image: grafana/grafana-enterprise:latest
+grafana_admin_user: admin
+grafana_admin_password: devastation
+grafana_port: 3000
+prometheus_image: prom/prometheus:latest
+prometheus_port: 9090
+prometheus_retention: 15d
+loki_image: grafana/loki:3.6.0
+loki_port: 3100
+otel_collector_image: otel/opentelemetry-collector-contrib:0.153.0
+otel_grpc_port: 4317
+otel_http_port: 4318
+jaeger_image: cr.jaegertracing.io/jaegertracing/jaeger:2.19.0
+jaeger_ui_port: 16686
+node_exporter_image: prom/node-exporter:latest
+cadvisor_image: gcr.io/cadvisor/cadvisor:latest
+postgres_exporter_image: prometheuscommunity/postgres-exporter:latest
 
 validation_run_acceptance: false

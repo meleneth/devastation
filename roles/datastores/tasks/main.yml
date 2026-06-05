@@ -1,0 +1,28 @@
+---
+- name: Create Vault data directory
+  ansible.builtin.file:
+    path: "{{ devastation_paths.vault }}/data"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create Postgres data directories
+  ansible.builtin.file:
+    path: "{{ devastation_paths.postgres }}/{{ item.service }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ postgres_databases }}"
+
+- name: Start Vault and Postgres services
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services: >-
+      {{
+        ['vault']
+        + (postgres_databases | map(attribute='service') | list)
+        + (postgres_databases | map(attribute='service') | map('regex_replace', '$', '-exporter') | list)
+      }}
+    state: present

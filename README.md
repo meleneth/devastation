@@ -83,10 +83,18 @@ These names are served under `deva.station`:
 - `gitlab.deva.station`
 - `runner.deva.station`
 - `kind.deva.station`
-- `otel-collector.deva.station`, reserved
-- `grafana.deva.station`, reserved
-- `jaeger.deva.station`, reserved
-- `prometheus.deva.station`, reserved
+- `otel-collector.deva.station`
+- `grafana.deva.station`
+- `jaeger.deva.station`
+- `prometheus.deva.station`
+- `loki.deva.station`
+- `node-exporter.deva.station`
+- `cadvisor.deva.station`
+- `vault.deva.station`
+- `test-db.deva.station`
+- `development-db.deva.station`
+- `production-db.deva.station`
+- `otel-db.deva.station`
 
 ## Registry
 
@@ -173,6 +181,20 @@ New hostnames require a full automated rotation because there is no retained CA 
 
 ## GitLab
 
+## Data And Observability
+
+The compose project includes local dev data services and an observability stack:
+
+- Vault dev server: `http://vault.deva.station:8200`, root token `devastation`
+- Postgres 18 containers: `test-db`, `development-db`, `production-db`, and `otel-db`
+- Grafana: `http://grafana.deva.station:3000`, admin password `devastation`
+- Prometheus: `http://prometheus.deva.station:9090`
+- Jaeger v2: `http://jaeger.deva.station:16686`
+- Loki: `http://loki.deva.station:3100`
+- OTLP collector endpoint: `otel-collector.deva.station:4317` for gRPC and `:4318` for HTTP
+
+Grafana is provisioned with Prometheus, Loki, Jaeger, and all four Postgres databases as data sources. Starter dashboards are generated under `/srv/devastation/observability/grafana/dashboards`. Prometheus scrapes node-exporter, cAdvisor, the registry metrics endpoints, Grafana, Loki, Vault, OTel Collector, and Postgres exporters.
+
 GitLab CE runs at `https://gitlab.deva.station` and exposes SSH on host port `2222`. GitLab stores persistent data under `/srv/devastation/gitlab`.
 
 The playbook stops before touching existing GitLab data unless one of these is true:
@@ -245,7 +267,7 @@ Reset KIND only:
 Inspect logs:
 
 ```bash
-docker compose -f /srv/devastation/compose/compose.yml logs -f dns registry apt-cache gitlab gitlab-runner
+docker compose -f /srv/devastation/compose/compose.yml logs -f dns registry apt-cache gitlab gitlab-runner prometheus grafana loki jaeger otel-collector vault
 ```
 
 Regenerate by convergence:
