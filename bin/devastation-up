@@ -21,9 +21,7 @@ for arg in "${args[@]}"; do
   esac
 done
 
-if [[ "${DEVASTATION_ASK_BECOME_PASS:-0}" == "1" ]]; then
-  needs_become_prompt=1
-elif sudo -n true >/dev/null 2>&1; then
+if [[ "${DEVASTATION_ASSUME_WARM_SUDO:-0}" == "1" ]]; then
   needs_become_prompt=0
 fi
 

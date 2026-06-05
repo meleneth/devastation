@@ -56,7 +56,7 @@ Bring the environment up:
 
 On success, `devastation-up` opens [Devastation Home](http://www.deva.station). Set `DEVASTATION_OPEN_HOME=0` to only print the URL.
 
-If sudo needs a password, `devastation-up` automatically passes `--ask-become-pass` to Ansible unless sudo is already warm. Use `DEVASTATION_ASK_BECOME_PASS=1` to force that prompt, or `DEVASTATION_DEBUG_UP=1` to print the exact Ansible command line.
+By default, `devastation-up` passes `--ask-become-pass` to Ansible. Set `DEVASTATION_ASSUME_WARM_SUDO=1` to skip that prompt when sudo is already warm, or `DEVASTATION_DEBUG_UP=1` to print the exact Ansible command line.
 
 Run full validation:
 
