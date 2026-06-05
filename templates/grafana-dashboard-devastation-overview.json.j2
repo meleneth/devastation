@@ -34,7 +34,7 @@
         {
           "refId": "A",
           "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
-          "legendFormat": "{{ instance }}"
+          "legendFormat": "{{ '{{' }} instance {{ '}}' }}"
         }
       ]
     },
@@ -47,7 +47,7 @@
         {
           "refId": "A",
           "expr": "sum by (name) (container_memory_usage_bytes{name!=\"\"})",
-          "legendFormat": "{{ name }}"
+          "legendFormat": "{{ '{{' }} name {{ '}}' }}"
         }
       ]
     },
@@ -60,7 +60,7 @@
         {
           "refId": "A",
           "expr": "sum by (job, code) (rate(registry_http_requests_total[5m]))",
-          "legendFormat": "{{ job }} {{ code }}"
+          "legendFormat": "{{ '{{' }} job {{ '}}' }} {{ '{{' }} code {{ '}}' }}"
         }
       ]
     },
