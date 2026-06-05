@@ -1,6 +1,6 @@
 # devastation
 
-`devastation` builds an idempotent local-first development environment for a Debian or Ubuntu laptop. It uses Ansible, Docker Compose, CoreDNS, an ephemeral local root CA workflow, a standalone Docker registry, apt-cacher-ng, KIND, GitLab CE, GitLab Runner, and Neovim.
+`devastation` builds an idempotent local-first development environment for a Debian or Ubuntu laptop. It uses Ansible, Docker Compose, CoreDNS, an ephemeral local root CA workflow, a standalone Docker registry, a pull-through registry cache, apt-cacher-ng, KIND, GitLab CE, GitLab Runner, Neovim, Vault, Eventline GoAWS, MinIO, Postgres, and a prewired observability stack with Prometheus, Grafana, Loki, Jaeger, OpenTelemetry Collector, node-exporter, and cAdvisor.
 
 The internal DNS root is `deva.station`.
 
@@ -18,8 +18,25 @@ Persistent state defaults to `/srv/devastation`:
 - `/srv/devastation/kind`: KIND cluster config
 - `/srv/devastation/gitlab`: GitLab config, logs, and data
 - `/srv/devastation/gitlab-runner`: GitLab Runner config
+- `/srv/devastation/observability`: Prometheus, Grafana, Loki, Jaeger, and OTel configuration/data
+- `/srv/devastation/vault`: Vault dev-mode data
+- `/srv/devastation/eventline`: Eventline GoAWS configuration/data
+- `/srv/devastation/storage`: MinIO object data
+- `/srv/devastation/postgres`: Postgres database data
 
 Core services run on the Docker network `devastation` with static addresses in `172.30.42.0/24`. CoreDNS serves `deva.station` and forwards everything else to configurable upstream resolvers.
+
+The current feature set includes:
+
+- Private `deva.station` DNS and `/etc/hosts` records for every core service
+- Ephemeral local root CA issuance with host, browser NSS, Docker, KIND, and GitLab Runner trust installation
+- Local HTTPS Docker registry plus Docker Hub pull-through cache
+- Host apt proxying through apt-cacher-ng
+- KIND with local registry trust, cert-manager, Istio, Argo CD, and the OpenTelemetry Operator
+- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Neovim, pyenv, rbenv, ruby-build, nvm, and MesloLGS Nerd Font
+- GitLab CE and a Docker-executor GitLab Runner
+- Vault dev server, Eventline GoAWS SNS/SQS emulator, MinIO object storage, and four Postgres containers
+- Prometheus, Grafana, Loki, Jaeger v2, OpenTelemetry Collector, node-exporter, cAdvisor, registry metrics, and Postgres exporters
 
 ## Quick Start
 
@@ -48,7 +65,7 @@ Run only Ansible syntax checks before changing a machine:
 ansible-playbook --syntax-check playbooks/bootstrap.yml
 ```
 
-Most settings live in `group_vars/all.yml`, including paths, package lists, host resolver behavior, GitLab migration gates, registry auth, and Docker socket use for the runner.
+Most settings live in `group_vars/all.yml`, including paths, static service IPs, DNS records, package lists, tool versions, host resolver behavior, GitLab migration gates, registry auth, datastore credentials, observability images, Kubernetes add-ons, and Docker socket use for the runner.
 
 ## User Setup
 
@@ -111,6 +128,8 @@ Acceptance flow:
 That builds `registry.deva.station/devastation/hello:local`, pushes it, pulls it, deploys it into KIND, and verifies DNS from a pod.
 
 Registry auth is disabled by default for simple local use. Set `registry_enable_auth: true` only after adding htpasswd material under `/srv/devastation/registry/auth/htpasswd`.
+
+Both registry services expose Prometheus metrics on the internal registry metrics port and are scraped by the bundled Prometheus instance.
 
 ## Apt Cache
 
@@ -179,9 +198,7 @@ Rotate the full trust universe:
 ./bin/devastation-rotate-trust-universe
 ```
 
-New hostnames require a full automated rotation because there is no retained CA private key for single-certificate issuance. Add hostnames to `devastation_internal_hostnames` and add required leaf cert names to `ca_leaf_certificates` in `group_vars/all.yml`, then run the rotation command. `./bin/devastation-mint-cert` intentionally refuses single-certificate minting.
-
-## GitLab
+New hostnames require a full automated rotation because there is no retained CA private key for single-certificate issuance. Add hostnames to `devastation_internal_hostnames`, add required HTTPS leaf certificate names to `ca_leaf_certificates` in `group_vars/all.yml`, then run the rotation command. `./bin/devastation-mint-cert` intentionally refuses single-certificate minting.
 
 ## Data And Observability
 
@@ -190,16 +207,26 @@ The compose project includes local dev data services and an observability stack:
 - Vault dev server: `http://vault.deva.station:8200`, root token `devastation`
 - Eventline GoAWS SNS/SQS emulator: `http://eventline.deva.station:4100`
 - MinIO object storage: `http://storage.deva.station:9000`, console `http://storage.deva.station:9001`, root credentials `devastation` / `devastation`
-- Postgres 18 containers: `test-db`, `development-db`, `production-db`, and `otel-db`
-- Grafana: `http://grafana.deva.station:3000`, admin password `devastation`
+- Postgres 18 containers: `test-db`, `development-db`, `production-db`, and `otel-db`, exposed on host ports `5433` through `5436` with default credentials `devastation` / `devastation`
+- Grafana Enterprise latest: `http://grafana.deva.station:3000`, admin password `devastation`
 - Prometheus: `http://prometheus.deva.station:9090`
 - Jaeger v2: `http://jaeger.deva.station:16686`
 - Loki: `http://loki.deva.station:3100`
 - OTLP collector endpoint: `otel-collector.deva.station:4317` for gRPC and `:4318` for HTTP
 
-Grafana is provisioned with Prometheus, Loki, Jaeger, and all four Postgres databases as data sources. Starter dashboards are generated under `/srv/devastation/observability/grafana/dashboards`. Prometheus scrapes node-exporter, cAdvisor, the registry metrics endpoints, Grafana, Loki, Vault, OTel Collector, and Postgres exporters.
+Grafana is provisioned with Prometheus, Loki, Jaeger, and all four Postgres databases as data sources. Starter dashboards are generated under `/srv/devastation/observability/grafana/dashboards`, including a system overview and database dashboard. Prometheus scrapes Prometheus itself, node-exporter, cAdvisor, both registry metrics endpoints, Grafana, Loki, Vault, OTel Collector internal metrics, OTel Collector pipeline metrics, and Postgres exporters for every database container.
 
-The host toolchain includes Helm, K9s, Lazydocker, and Trivy. The KIND cluster is bootstrapped with Istio, Argo CD, cert-manager, and the OpenTelemetry Operator when `kind_install_platform_addons` is enabled. MinIO is pinned to a known community image tag because current MinIO community image publishing is in flux; use `minio_image` to swap in a preferred fork or enterprise image.
+The OTel Collector receives OTLP over gRPC and HTTP, then exports traces to Jaeger and logs to Loki. The `otel-db` Postgres container is included as a Grafana datasource so experiments that need an observability-owned database have a reserved target from day one.
+
+MinIO is pinned to a known community image tag because current MinIO community image publishing is in flux; use `minio_image` to swap in a preferred fork or enterprise image.
+
+## Kubernetes And Tools
+
+The host toolchain includes Helm, kubectl, K9s, Lazydocker, and Trivy. The KIND cluster is configured with the local registry trust and is bootstrapped with cert-manager, Istio, Argo CD, and the OpenTelemetry Operator when `kind_install_platform_addons` is enabled.
+
+Default versions are pinned in `group_vars/all.yml`: KIND `v0.23.0`, kubectl `v1.30.2`, node image `kindest/node:v1.30.0`, Helm `v4.2.0`, K9s `v0.50.18`, Lazydocker `0.25.0`, Trivy `0.70.0`, Istio `1.30.0`, Argo CD `v3.4.2`, and OpenTelemetry Operator `v0.151.0`.
+
+## GitLab
 
 GitLab CE runs at `https://gitlab.deva.station` and exposes SSH on host port `2222`. GitLab stores persistent data under `/srv/devastation/gitlab`.
 
@@ -273,7 +300,7 @@ Reset KIND only:
 Inspect logs:
 
 ```bash
-docker compose -f /srv/devastation/compose/compose.yml logs -f dns registry apt-cache gitlab gitlab-runner prometheus grafana loki jaeger otel-collector vault eventline storage
+docker compose -f /srv/devastation/compose/compose.yml logs -f dns registry registry-cache apt-cache vault eventline storage test-db development-db production-db otel-db prometheus grafana loki jaeger otel-collector node-exporter cadvisor gitlab gitlab-runner
 ```
 
 Regenerate by convergence:
@@ -290,11 +317,20 @@ Rotate certificates and reinstall trust:
 
 ## Security Posture
 
-No secrets are committed. The root CA private key is an ephemeral build artifact and is destroyed after signing; validation fails if `/srv/devastation/ca/root-ca.key` exists after rotation. Generated secret directories are not world-readable. Dangerous options are explicit in `group_vars/all.yml`:
+No generated secrets or private keys are committed. The root CA private key is an ephemeral build artifact and is destroyed after signing; validation fails if `/srv/devastation/ca/root-ca.key` exists after rotation. Generated secret directories are not world-readable.
+
+Some local-only development defaults are intentionally documented and low entropy: Vault token `devastation`, Postgres password `devastation`, MinIO password `devastation`, and Grafana admin password `devastation`. Change those variables before using this outside a disposable local development machine.
+
+Dangerous options and sensitive defaults are explicit in `group_vars/all.yml`:
 
 - `docker_insecure_registry_fallback`
 - `gitlab_allow_existing_data`
 - `gitlab_migration_enabled`
 - `gitlab_runner_mount_docker_socket`
+- `kind_install_platform_addons`
+- `vault_dev_root_token`
+- `postgres_default_password`
+- `minio_root_password`
+- `grafana_admin_password`
 
-Privileged surfaces are documented here: Docker itself, GitLab in Docker, KIND nodes, and optional Docker socket mounting for runner jobs.
+Privileged surfaces are documented here: Docker itself, GitLab in Docker, KIND nodes, Kubernetes admin access, optional Docker socket mounting for runner jobs, Vault dev mode, cAdvisor host mounts, node-exporter host PID/rootfs mounts, local object/database services with default credentials, and security-tool downloads such as Trivy.
