@@ -115,6 +115,39 @@ These names are served under `deva.station`:
 - `production-db.deva.station`
 - `otel-db.deva.station`
 
+## Service Links
+
+Browser-friendly local links:
+
+- [GitLab](https://gitlab.deva.station)
+- [Grafana](http://grafana.deva.station:3000)
+- [Prometheus](http://prometheus.deva.station:9090)
+- [Jaeger](http://jaeger.deva.station:16686)
+- [Loki readiness](http://loki.deva.station:3100/ready)
+- [Vault](http://vault.deva.station:8200)
+- [Eventline GoAWS](http://eventline.deva.station:4100)
+- [MinIO API](http://storage.deva.station:9000)
+- [MinIO Console](http://storage.deva.station:9001)
+- [Local registry API](https://registry.deva.station/v2/)
+- [Registry metrics](http://registry.deva.station:5001/metrics)
+- [Registry cache API](http://registry-cache.deva.station:5000/v2/)
+- [Registry cache metrics](http://registry-cache.deva.station:5001/metrics)
+- [Apt cache](http://apt-cache.deva.station:3142)
+- [OTel Collector metrics](http://otel-collector.deva.station:8888/metrics)
+- [OTel Collector Prometheus exporter](http://otel-collector.deva.station:9464/metrics)
+- [node-exporter metrics](http://node-exporter.deva.station:9100/metrics)
+- [cAdvisor](http://cadvisor.deva.station:8080)
+
+Non-browser endpoints:
+
+- OTLP gRPC: `otel-collector.deva.station:4317`
+- OTLP HTTP: `http://otel-collector.deva.station:4318`
+- GitLab SSH: `ssh://git@gitlab.deva.station:2222`
+- Postgres test DB: `postgres://devastation:devastation@test-db.deva.station:5432/test_db`
+- Postgres development DB: `postgres://devastation:devastation@development-db.deva.station:5432/development_db`
+- Postgres production DB: `postgres://devastation:devastation@production-db.deva.station:5432/production_db`
+- Postgres OTel DB: `postgres://devastation:devastation@otel-db.deva.station:5432/otel_db`
+
 ## Registry
 
 The canonical local Kubernetes registry is `registry.deva.station` over HTTPS with the local root CA. The pull-through Docker Hub cache is `registry-cache.deva.station`. Host Docker trusts the CA through `/etc/docker/certs.d/registry.deva.station/ca.crt`; KIND nodes receive `/etc/containerd/certs.d/registry.deva.station/hosts.toml` and the CA certificate.
