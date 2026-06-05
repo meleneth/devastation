@@ -111,6 +111,15 @@ services:
       devastation:
         ipv4_address: {{ devastation_subnets.storage }}
 
+  www:
+    image: {{ www_image }}
+    restart: unless-stopped
+    volumes:
+      - {{ devastation_paths.www }}/html:/usr/share/nginx/html:ro
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.www }}
+
 {% for pg in postgres_databases %}
   {{ pg.service }}:
     image: postgres:{{ postgres_version }}

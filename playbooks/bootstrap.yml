@@ -36,6 +36,7 @@
         - { path: "{{ devastation_paths.vault }}", mode: "0755" }
         - { path: "{{ devastation_paths.eventline }}", mode: "0755" }
         - { path: "{{ devastation_paths.storage }}", mode: "0755" }
+        - { path: "{{ devastation_paths.www }}", mode: "0755" }
         - { path: "{{ devastation_paths.postgres }}", mode: "0755" }
         - { path: "{{ devastation_paths.logs }}", mode: "0755" }
 
@@ -116,6 +117,10 @@
     - name: Apply storage role
       ansible.builtin.import_role:
         name: storage
+
+    - name: Apply web portal role
+      ansible.builtin.import_role:
+        name: www
 
     - name: Apply observability role
       ansible.builtin.import_role:

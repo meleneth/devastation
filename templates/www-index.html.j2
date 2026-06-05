@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Devastation</title>
+    <script>
+      window.tailwind = window.tailwind || {};
+      window.tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              lospec: {
+                ink: "#10121c",
+                dusk: "#2c1e31",
+                wine: "#6b2643",
+                red: "#ec273f",
+                orange: "#e98537",
+                gold: "#f3a833",
+                bark: "#4d3533",
+                tan: "#dab163",
+                cream: "#f7f3b7",
+                pine: "#1e4044",
+                green: "#5ab552",
+                lime: "#9de64e",
+                teal: "#008b8b",
+                mint: "#d3eed3",
+                indigo: "#3e3b65",
+                blue: "#3388de",
+                sky: "#36c5f4",
+                cyan: "#6dead6",
+                violet: "#8c78a5",
+                lavender: "#deceed",
+                mauve: "#c878af",
+                pink: "#fa6e79",
+                blush: "#ffd1d5",
+                white: "#ffffff"
+              }
+            },
+            boxShadow: {
+              pixel: "0 0 0 2px #10121c, 6px 6px 0 0 #10121c"
+            },
+            fontFamily: {
+              pixel: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"]
+            }
+          }
+        }
+      };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  </head>
+  <body class="min-h-screen bg-lospec-ink text-lospec-white font-pixel antialiased">
+    <div id="app" class="min-h-screen overflow-hidden">
+      <div class="fixed inset-0 opacity-25 pointer-events-none" aria-hidden="true">
+        <div class="absolute inset-0" style="background-image: linear-gradient(#2c1e31 1px, transparent 1px), linear-gradient(90deg, #2c1e31 1px, transparent 1px); background-size: 24px 24px;"></div>
+      </div>
+
+      <main class="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-5 py-6 sm:px-8 lg:px-10">
+        <header class="flex flex-col gap-5 border-b-4 border-lospec-blue pb-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p class="mb-3 inline-block border-2 border-lospec-lime bg-lospec-pine px-3 py-1 text-xs uppercase tracking-widest text-lospec-lime">deva.station</p>
+            <h1 class="text-4xl font-black uppercase leading-none text-lospec-cream sm:text-6xl lg:text-7xl">Devastation</h1>
+            <p class="mt-4 max-w-3xl text-sm leading-6 text-lospec-mint sm:text-base">
+              Local-first services, tools, telemetry, and databases. One page, many doors.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 text-center text-xs uppercase">
+            <div class="border-2 border-lospec-cyan bg-lospec-indigo px-3 py-2">
+              <div class="text-lospec-cyan" v-text="browserLinks.length"></div>
+              <div class="text-lospec-lavender">sites</div>
+            </div>
+            <div class="border-2 border-lospec-gold bg-lospec-bark px-3 py-2">
+              <div class="text-lospec-gold" v-text="endpointLinks.length"></div>
+              <div class="text-lospec-cream">endpoints</div>
+            </div>
+            <div class="border-2 border-lospec-pink bg-lospec-wine px-3 py-2">
+              <div class="text-lospec-pink">42</div>
+              <div class="text-lospec-blush">colors</div>
+            </div>
+          </div>
+        </header>
+
+        <section class="grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
+          <aside class="space-y-5">
+            <div class="border-4 border-lospec-white bg-lospec-dusk p-4 shadow-pixel">
+              <label for="filter" class="mb-2 block text-xs uppercase text-lospec-sky">Filter</label>
+              <input id="filter" v-model="filter" class="w-full border-2 border-lospec-white bg-lospec-ink px-3 py-2 text-lospec-white outline-none focus:border-lospec-lime" placeholder="grafana, db, traces">
+            </div>
+
+            <div class="border-4 border-lospec-white bg-lospec-pine p-4 shadow-pixel">
+              <p class="text-xs uppercase text-lospec-lime">Palette</p>
+              <div class="mt-3 grid grid-cols-7 gap-1">
+                <span v-for="color in palette" :key="color" class="aspect-square border border-lospec-ink" :style="{ backgroundColor: color }"></span>
+              </div>
+            </div>
+          </aside>
+
+          <div class="space-y-8">
+            <section>
+              <div class="mb-3 flex items-end justify-between gap-4">
+                <h2 class="text-2xl font-black uppercase text-lospec-sky">Sites</h2>
+                <span class="text-xs uppercase text-lospec-violet" v-text="`${filteredBrowserLinks.length} visible`"></span>
+              </div>
+              <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <a v-for="link in filteredBrowserLinks" :key="link.href" :href="link.href" class="group border-4 border-lospec-white bg-lospec-indigo p-4 shadow-pixel transition hover:-translate-y-1 hover:bg-lospec-blue focus:outline-none focus:ring-4 focus:ring-lospec-lime">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <p class="text-lg font-black uppercase text-lospec-white" v-text="link.name"></p>
+                      <p class="mt-2 text-xs leading-5 text-lospec-lavender" v-text="link.description"></p>
+                    </div>
+                    <span class="border-2 border-lospec-cyan px-2 py-1 text-xs text-lospec-cyan" v-text="link.kind"></span>
+                  </div>
+                  <p class="mt-4 break-all text-xs text-lospec-cyan" v-text="link.href"></p>
+                </a>
+              </div>
+            </section>
+
+            <section>
+              <div class="mb-3 flex items-end justify-between gap-4">
+                <h2 class="text-2xl font-black uppercase text-lospec-gold">Endpoints</h2>
+                <span class="text-xs uppercase text-lospec-violet" v-text="`${filteredEndpointLinks.length} visible`"></span>
+              </div>
+              <div class="grid gap-3 md:grid-cols-2">
+                <div v-for="link in filteredEndpointLinks" :key="link.value" class="border-2 border-lospec-tan bg-lospec-bark p-3">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <p class="font-black uppercase text-lospec-cream" v-text="link.name"></p>
+                      <p class="mt-1 text-xs text-lospec-tan" v-text="link.description"></p>
+                    </div>
+                    <span class="text-xs text-lospec-gold" v-text="link.kind"></span>
+                  </div>
+                  <code class="mt-3 block break-all bg-lospec-ink px-2 py-2 text-xs text-lospec-mint" v-text="link.value"></code>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const { createApp } = Vue;
+
+      createApp({
+        data() {
+          return {
+            filter: "",
+            palette: [
+              "#10121c", "#2c1e31", "#6b2643", "#ac2847", "#ec273f", "#94493a", "#de5d3a",
+              "#e98537", "#f3a833", "#4d3533", "#6e4c30", "#a26d3f", "#ce9248", "#dab163",
+              "#e8d282", "#f7f3b7", "#1e4044", "#006554", "#26854c", "#5ab552", "#9de64e",
+              "#008b8b", "#62a477", "#a6cb96", "#d3eed3", "#3e3b65", "#3859b3", "#3388de",
+              "#36c5f4", "#6dead6", "#5e5b8c", "#8c78a5", "#b0a7b8", "#deceed", "#9a4d76",
+              "#c878af", "#cc99ff", "#fa6e79", "#ffa2ac", "#ffd1d5", "#f6e8e0", "#ffffff"
+            ],
+            browserLinks: [
+              { name: "GitLab", href: "https://gitlab.deva.station", kind: "code", description: "Local GitLab CE, projects, issues, and CI." },
+              { name: "Grafana", href: "http://grafana.deva.station:3000", kind: "obs", description: "Dashboards, logs, traces, metrics, and Postgres datasources." },
+              { name: "Prometheus", href: "http://prometheus.deva.station:9090", kind: "obs", description: "Metrics scrape targets and PromQL." },
+              { name: "Jaeger", href: "http://jaeger.deva.station:16686", kind: "traces", description: "Distributed tracing UI wired through OTel." },
+              { name: "Loki Ready", href: "http://loki.deva.station:3100/ready", kind: "logs", description: "Loki readiness endpoint." },
+              { name: "Vault", href: "http://vault.deva.station:8200", kind: "secrets", description: "HashiCorp Vault dev server." },
+              { name: "Eventline", href: "http://eventline.deva.station:4100", kind: "aws", description: "GoAWS SNS/SQS emulator." },
+              { name: "MinIO API", href: "http://storage.deva.station:9000", kind: "object", description: "S3-compatible object storage API." },
+              { name: "MinIO Console", href: "http://storage.deva.station:9001", kind: "object", description: "Object storage browser and admin console." },
+              { name: "Registry API", href: "https://registry.deva.station/v2/", kind: "images", description: "HTTPS local Docker registry API." },
+              { name: "Registry Metrics", href: "http://registry.deva.station:5001/metrics", kind: "metrics", description: "Prometheus metrics for the local registry." },
+              { name: "Registry Cache API", href: "http://registry-cache.deva.station:5000/v2/", kind: "images", description: "Docker Hub pull-through cache API." },
+              { name: "Registry Cache Metrics", href: "http://registry-cache.deva.station:5001/metrics", kind: "metrics", description: "Prometheus metrics for the registry cache." },
+              { name: "Apt Cache", href: "http://apt-cache.deva.station:3142", kind: "cache", description: "apt-cacher-ng package cache." },
+              { name: "OTel Metrics", href: "http://otel-collector.deva.station:8888/metrics", kind: "otel", description: "OpenTelemetry Collector internal metrics." },
+              { name: "OTel Prom Exporter", href: "http://otel-collector.deva.station:9464/metrics", kind: "otel", description: "Collector Prometheus exporter endpoint." },
+              { name: "node-exporter", href: "http://node-exporter.deva.station:9100/metrics", kind: "host", description: "Host metrics exposed for Prometheus." },
+              { name: "cAdvisor", href: "http://cadvisor.deva.station:8080", kind: "host", description: "Container and host resource visibility." }
+            ],
+            endpointLinks: [
+              { name: "OTLP gRPC", value: "otel-collector.deva.station:4317", kind: "otel", description: "Trace, metric, and log intake over gRPC." },
+              { name: "OTLP HTTP", value: "http://otel-collector.deva.station:4318", kind: "otel", description: "Trace, metric, and log intake over HTTP." },
+              { name: "KIND API", value: "https://kind.deva.station:6443", kind: "k8s", description: "KIND Kubernetes API endpoint." },
+              { name: "GitLab SSH", value: "ssh://git@gitlab.deva.station:2222", kind: "git", description: "Git over SSH." },
+              { name: "test-db", value: "postgres://devastation:devastation@test-db.deva.station:5432/test_db", kind: "db", description: "Postgres test database." },
+              { name: "development-db", value: "postgres://devastation:devastation@development-db.deva.station:5432/development_db", kind: "db", description: "Postgres development database." },
+              { name: "production-db", value: "postgres://devastation:devastation@production-db.deva.station:5432/production_db", kind: "db", description: "Postgres production database." },
+              { name: "otel-db", value: "postgres://devastation:devastation@otel-db.deva.station:5432/otel_db", kind: "db", description: "Reserved Postgres database for observability experiments." }
+            ]
+          };
+        },
+        computed: {
+          filteredBrowserLinks() {
+            return this.filterLinks(this.browserLinks);
+          },
+          filteredEndpointLinks() {
+            return this.filterLinks(this.endpointLinks);
+          }
+        },
+        methods: {
+          filterLinks(links) {
+            const query = this.filter.trim().toLowerCase();
+            if (!query) return links;
+            return links.filter((link) => Object.values(link).join(" ").toLowerCase().includes(query));
+          }
+        }
+      }).mount("#app");
+    </script>
+  </body>
+</html>

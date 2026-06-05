@@ -22,13 +22,14 @@ Persistent state defaults to `/srv/devastation`:
 - `/srv/devastation/vault`: Vault dev-mode data
 - `/srv/devastation/eventline`: Eventline GoAWS configuration/data
 - `/srv/devastation/storage`: MinIO object data
+- `/srv/devastation/www`: static `www.deva.station` portal files
 - `/srv/devastation/postgres`: Postgres database data
 
 Core services run on the Docker network `devastation` with static addresses in `172.30.42.0/24`. CoreDNS serves `deva.station` and forwards everything else to configurable upstream resolvers.
 
 The current feature set includes:
 
-- Private `deva.station` DNS and `/etc/hosts` records for every core service
+- Private `deva.station` DNS and `/etc/hosts` records for every core service, plus a `www.deva.station` portal
 - Ephemeral local root CA issuance with host, browser NSS, Docker, KIND, and GitLab Runner trust installation
 - Local HTTPS Docker registry plus Docker Hub pull-through cache
 - Host apt proxying through apt-cacher-ng
@@ -110,6 +111,7 @@ These names are served under `deva.station`:
 - `vault.deva.station`
 - `eventline.deva.station`
 - `storage.deva.station`
+- `www.deva.station`
 - `test-db.deva.station`
 - `development-db.deva.station`
 - `production-db.deva.station`
@@ -120,6 +122,7 @@ These names are served under `deva.station`:
 Browser-friendly local links:
 
 - [GitLab](https://gitlab.deva.station)
+- [Devastation Home](http://www.deva.station)
 - [Grafana](http://grafana.deva.station:3000)
 - [Prometheus](http://prometheus.deva.station:9090)
 - [Jaeger](http://jaeger.deva.station:16686)
@@ -334,7 +337,7 @@ Reset KIND only:
 Inspect logs:
 
 ```bash
-docker compose -f /srv/devastation/compose/compose.yml logs -f dns registry registry-cache apt-cache vault eventline storage test-db development-db production-db otel-db prometheus grafana loki jaeger otel-collector node-exporter cadvisor gitlab gitlab-runner
+docker compose -f /srv/devastation/compose/compose.yml logs -f dns www registry registry-cache apt-cache vault eventline storage test-db development-db production-db otel-db prometheus grafana loki jaeger otel-collector node-exporter cadvisor gitlab gitlab-runner
 ```
 
 Regenerate by convergence:

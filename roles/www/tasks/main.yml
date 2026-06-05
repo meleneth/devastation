@@ -1,0 +1,26 @@
+---
+- name: Create web portal directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ devastation_paths.www }}"
+    - "{{ devastation_paths.www }}/html"
+
+- name: Write web portal homepage
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/www-index.html.j2"
+    dest: "{{ devastation_paths.www }}/html/index.html"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Start web portal service
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - www
+    state: present
