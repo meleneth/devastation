@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+if ! ansible-galaxy collection list community.docker >/dev/null 2>&1; then
+  ansible-galaxy collection install -r requirements.yml
+fi
+
+ansible-playbook playbooks/bootstrap.yml "$@"

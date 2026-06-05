@@ -1,0 +1,114 @@
+services:
+  dns:
+    image: coredns/coredns:1.11.1
+    command: ["-conf", "/etc/coredns/Corefile"]
+    restart: unless-stopped
+    volumes:
+      - {{ devastation_paths.dns }}/Corefile:/etc/coredns/Corefile:ro
+    ports:
+      - "127.0.0.1:53:53/udp"
+      - "127.0.0.1:53:53/tcp"
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.dns }}
+
+  registry:
+    image: registry:2.8.3
+    restart: unless-stopped
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:443
+      REGISTRY_HTTP_TLS_CERTIFICATE: /certs/tls.crt
+      REGISTRY_HTTP_TLS_KEY: /certs/tls.key
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+{% if registry_enable_auth %}
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: devastation
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+{% endif %}
+    volumes:
+      - {{ devastation_paths.registry }}/data:/var/lib/registry
+      - {{ devastation_paths.certs }}/registry.{{ devastation_domain }}:/certs:ro
+{% if registry_enable_auth %}
+      - {{ devastation_paths.registry }}/auth:/auth:ro
+{% endif %}
+    ports:
+      - "443:443"
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.registry }}
+
+{% if registry_pull_through_cache_enabled %}
+  registry-cache:
+    image: registry:2.8.3
+    restart: unless-stopped
+    environment:
+      REGISTRY_PROXY_REMOTEURL: {{ registry_pull_through_remoteurl }}
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+    volumes:
+      - {{ devastation_paths.registry }}/pull-through-cache:/var/lib/registry
+    ports:
+      - "5001:5000"
+    networks:
+      - devastation
+{% endif %}
+
+  apt-cache:
+    image: sameersbn/apt-cacher-ng:3.7.4-20220421
+    restart: unless-stopped
+    volumes:
+      - {{ devastation_paths.apt_cache }}/data:/var/cache/apt-cacher-ng
+    ports:
+      - "{{ apt_cache_port }}:3142"
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.apt_cache }}
+
+  gitlab:
+    image: gitlab/gitlab-ce:{{ gitlab_version }}
+    restart: unless-stopped
+    hostname: gitlab.{{ devastation_domain }}
+    shm_size: "256m"
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url '{{ gitlab_external_url }}'
+        gitlab_rails['gitlab_shell_ssh_port'] = {{ gitlab_ssh_port }}
+        nginx['listen_port'] = 443
+        nginx['listen_https'] = true
+        nginx['ssl_certificate'] = "/etc/gitlab/ssl/gitlab.{{ devastation_domain }}.crt"
+        nginx['ssl_certificate_key'] = "/etc/gitlab/ssl/gitlab.{{ devastation_domain }}.key"
+        registry_external_url nil
+    ports:
+      - "{{ gitlab_http_port }}:80"
+      - "{{ gitlab_https_port }}:443"
+      - "{{ gitlab_ssh_port }}:22"
+    volumes:
+      - {{ devastation_paths.gitlab }}/config:/etc/gitlab
+      - {{ devastation_paths.gitlab }}/logs:/var/log/gitlab
+      - {{ devastation_paths.gitlab }}/data:/var/opt/gitlab
+      - {{ devastation_paths.certs }}/gitlab.{{ devastation_domain }}/tls.crt:/etc/gitlab/ssl/gitlab.{{ devastation_domain }}.crt:ro
+      - {{ devastation_paths.certs }}/gitlab.{{ devastation_domain }}/tls.key:/etc/gitlab/ssl/gitlab.{{ devastation_domain }}.key:ro
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.gitlab }}
+
+  gitlab-runner:
+    image: gitlab/gitlab-runner:{{ gitlab_runner_version }}
+    restart: unless-stopped
+    volumes:
+      - {{ devastation_paths.gitlab_runner }}/config:/etc/gitlab-runner
+      - {{ devastation_paths.ca }}/root-ca.crt:/etc/gitlab-runner/certs/ca.crt:ro
+{% if gitlab_runner_mount_docker_socket %}
+      - /var/run/docker.sock:/var/run/docker.sock
+{% endif %}
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.runner }}
+
+networks:
+  devastation:
+    name: devastation
+    driver: bridge
+    ipam:
+      config:
+        - subnet: {{ devastation_subnets.services }}
+          gateway: {{ devastation_subnets.service_gateway }}

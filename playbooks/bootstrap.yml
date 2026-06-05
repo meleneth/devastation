@@ -1,0 +1,97 @@
+---
+- name: Build the devastation local development bunker
+  hosts: localhost
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Assert Debian family host
+      ansible.builtin.assert:
+        that:
+          - ansible_os_family == "Debian"
+        fail_msg: "devastation supports Debian-family hosts only."
+
+    - name: Assert deprecated DNS root is absent from variables
+      ansible.builtin.assert:
+        that:
+          - devastation_domain == "deva.station"
+        fail_msg: "Only deva.station is supported as the internal DNS root."
+
+    - name: Create devastation base directories
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: "{{ devastation_root }}", mode: "0755" }
+        - { path: "{{ devastation_paths.certs }}", mode: "0755" }
+        - { path: "{{ devastation_paths.ca }}", mode: "0700" }
+        - { path: "{{ devastation_paths.secrets }}", mode: "0700" }
+        - { path: "{{ devastation_paths.compose }}", mode: "0755" }
+        - { path: "{{ devastation_paths.logs }}", mode: "0755" }
+
+  tasks:
+    - name: Apply base packages role
+      ansible.builtin.import_role:
+        name: base_packages
+
+    - name: Apply Docker role
+      ansible.builtin.import_role:
+        name: docker
+
+    - name: Restart Docker before dependent services
+      ansible.builtin.meta: flush_handlers
+
+    - name: Apply user language toolchains role
+      ansible.builtin.import_role:
+        name: user_setup
+      when: user_setup_enabled
+
+    - name: Apply fonts role
+      ansible.builtin.import_role:
+        name: fonts
+      when: meslo_lgs_nerd_font_enabled
+
+    - name: Apply CA role
+      ansible.builtin.import_role:
+        name: ca
+
+    - name: Update host trust before service validation
+      ansible.builtin.meta: flush_handlers
+
+    - name: Apply DNS role
+      ansible.builtin.import_role:
+        name: dns
+
+    - name: Restart resolver before DNS-dependent services
+      ansible.builtin.meta: flush_handlers
+
+    - name: Apply registry role
+      ansible.builtin.import_role:
+        name: registry
+
+    - name: Apply apt cache role
+      ansible.builtin.import_role:
+        name: apt_cache
+
+    - name: Apply Neovim role
+      ansible.builtin.import_role:
+        name: neovim
+
+    - name: Apply KIND role
+      ansible.builtin.import_role:
+        name: kind
+
+    - name: Apply GitLab role
+      ansible.builtin.import_role:
+        name: gitlab
+
+    - name: Apply GitLab Runner role
+      ansible.builtin.import_role:
+        name: gitlab_runner
+
+    - name: Apply validation role
+      ansible.builtin.import_role:
+        name: validation

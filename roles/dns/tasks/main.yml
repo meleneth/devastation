@@ -1,0 +1,50 @@
+---
+- name: Create DNS directory
+  ansible.builtin.file:
+    path: "{{ devastation_paths.dns }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write CoreDNS Corefile
+  ansible.builtin.template:
+    src: Corefile.j2
+    dest: "{{ devastation_paths.dns }}/Corefile"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write shared Docker Compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ devastation_paths.compose }}/compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Start DNS service
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - dns
+    state: present
+
+- name: Ensure systemd-resolved drop-in directory exists
+  ansible.builtin.file:
+    path: "{{ dns_systemd_resolved_dropin | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: dns_configure_host_resolver
+
+- name: Configure host resolver for deva.station
+  ansible.builtin.template:
+    src: systemd-resolved-devastation.conf.j2
+    dest: "{{ dns_systemd_resolved_dropin }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: dns_configure_host_resolver
+  notify: Restart systemd-resolved

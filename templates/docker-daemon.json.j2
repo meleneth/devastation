@@ -1,0 +1,8 @@
+{
+  "dns": ["{{ docker_daemon_dns }}"],
+  "features": {
+    "buildkit": true
+  }{% if docker_insecure_registry_fallback %},
+  "insecure-registries": ["registry.{{ devastation_domain }}:443", "registry.{{ devastation_domain }}:5000"]
+  {% endif %}
+}

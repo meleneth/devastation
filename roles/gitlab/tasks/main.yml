@@ -1,0 +1,62 @@
+---
+- name: Check GitLab data directories
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ devastation_paths.gitlab }}/config"
+    - "{{ devastation_paths.gitlab }}/data"
+    - "{{ devastation_paths.gitlab }}/logs"
+  register: gitlab_dirs
+
+- name: Check whether GitLab data is managed by devastation
+  ansible.builtin.stat:
+    path: "{{ devastation_paths.gitlab }}/.devastation-managed"
+  register: gitlab_managed
+
+- name: Stop before touching existing GitLab data unless allowed
+  ansible.builtin.fail:
+    msg: >-
+      Existing GitLab data was detected under {{ devastation_paths.gitlab }}.
+      Set gitlab_allow_existing_data=true for normal reuse, or enable explicit migration variables for restore.
+  when:
+    - not gitlab_allow_existing_data
+    - not gitlab_migration_enabled
+    - not gitlab_managed.stat.exists
+    - gitlab_dirs.results | selectattr('stat.exists') | list | length > 0
+
+- name: Validate GitLab migration variables when enabled
+  ansible.builtin.assert:
+    that:
+      - gitlab_backup_tar | length > 0
+      - gitlab_old_config_path | length > 0
+      - gitlab_old_logs_path | length > 0
+      - gitlab_old_data_path | length > 0
+    fail_msg: "GitLab migration requires gitlab_backup_tar, gitlab_old_config_path, gitlab_old_logs_path, and gitlab_old_data_path."
+  when: gitlab_migration_enabled
+
+- name: Create GitLab directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ devastation_paths.gitlab }}/config"
+    - "{{ devastation_paths.gitlab }}/logs"
+    - "{{ devastation_paths.gitlab }}/data"
+
+- name: Mark GitLab data as managed by devastation
+  ansible.builtin.copy:
+    dest: "{{ devastation_paths.gitlab }}/.devastation-managed"
+    content: "managed-by=devastation\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Start GitLab service
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - gitlab
+    state: present

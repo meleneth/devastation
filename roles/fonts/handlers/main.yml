@@ -1,0 +1,4 @@
+---
+- name: Refresh font cache
+  ansible.builtin.command: fc-cache -f {{ meslo_lgs_nerd_font_dir }}
+  changed_when: true

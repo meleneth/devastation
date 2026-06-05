@@ -1,0 +1,151 @@
+---
+devastation_domain: deva.station
+devastation_root: /srv/devastation
+devastation_user: "{{ lookup('env', 'USER') | default(ansible_user_id, true) }}"
+
+devastation_subnets:
+  services: 172.30.42.0/24
+  service_gateway: 172.30.42.1
+  dns: 172.30.42.10
+  ca: 172.30.42.11
+  registry: 172.30.42.12
+  apt_cache: 172.30.42.13
+  gitlab: 172.30.42.14
+  runner: 172.30.42.15
+  kind: 172.30.42.20
+
+devastation_paths:
+  certs: "{{ devastation_root }}/certs"
+  ca: "{{ devastation_root }}/ca"
+  secrets: "{{ devastation_root }}/secrets"
+  compose: "{{ devastation_root }}/compose"
+  dns: "{{ devastation_root }}/dns"
+  registry: "{{ devastation_root }}/registry"
+  apt_cache: "{{ devastation_root }}/apt-cache"
+  kind: "{{ devastation_root }}/kind"
+  gitlab: "{{ devastation_root }}/gitlab"
+  gitlab_runner: "{{ devastation_root }}/gitlab-runner"
+  logs: "{{ devastation_root }}/logs"
+
+base_packages_extra: []
+base_packages_default:
+  - apt-transport-https
+  - bash
+  - build-essential
+  - ca-certificates
+  - conntrack
+  - coreutils
+  - curl
+  - dnsutils
+  - fd-find
+  - git
+  - gnupg
+  - iproute2
+  - jq
+  - make
+  - netcat-openbsd
+  - openssl
+  - pipx
+  - python3
+  - python3-pip
+  - python3-venv
+  - ripgrep
+  - rsync
+  - socat
+  - sudo
+  - unzip
+  - wget
+  - yq
+
+user_setup_enabled: true
+user_setup_home: "{{ lookup('ansible.builtin.env', 'HOME') }}"
+user_setup_shell_profile: "{{ user_setup_home }}/.profile"
+pyenv_repo: https://github.com/pyenv/pyenv.git
+pyenv_root: "{{ user_setup_home }}/.pyenv"
+rbenv_repo: https://github.com/rbenv/rbenv.git
+rbenv_root: "{{ user_setup_home }}/.rbenv"
+ruby_build_repo: https://github.com/rbenv/ruby-build.git
+nvm_repo: https://github.com/nvm-sh/nvm.git
+nvm_version: v0.40.1
+nvm_root: "{{ user_setup_home }}/.nvm"
+
+meslo_lgs_nerd_font_enabled: true
+meslo_lgs_nerd_font_version: v3.2.1
+meslo_lgs_nerd_font_dir: /usr/local/share/fonts/devastation/MesloLGS
+meslo_lgs_nerd_font_files:
+  - MesloLGS NF Regular.ttf
+  - MesloLGS NF Bold.ttf
+  - MesloLGS NF Italic.ttf
+  - MesloLGS NF Bold Italic.ttf
+
+install_nodejs_from_distro: true
+install_docker_engine: true
+docker_users:
+  - "{{ devastation_user }}"
+docker_daemon_dns: "{{ devastation_subnets.dns }}"
+docker_insecure_registry_fallback: false
+
+neovim_create_config_if_missing: true
+neovim_config_dir: "{{ lookup('env', 'HOME') }}/.config/nvim"
+
+dns_upstream_resolvers:
+  - 1.1.1.1
+  - 9.9.9.9
+dns_configure_host_resolver: true
+dns_systemd_resolved_dropin: /etc/systemd/resolved.conf.d/devastation.conf
+
+ca_install_host_trust: true
+ca_common_name: "Devastation Local Root CA"
+cert_subject_country: US
+cert_valid_days: 825
+
+registry_enable_auth: false
+registry_htpasswd_user: devastation
+registry_pull_through_cache_enabled: true
+registry_pull_through_remoteurl: https://registry-1.docker.io
+
+apt_cache_port: 3142
+apt_cache_configure_host: true
+apt_cache_prefetch_packages:
+  - git
+  - curl
+  - ca-certificates
+  - build-essential
+  - python3
+  - python3-venv
+  - jq
+  - ripgrep
+  - neovim
+apt_cache_prefetch_images:
+  - debian:bookworm-slim
+  - ubuntu:24.04
+  - alpine:3.20
+  - kindest/node:v1.30.0
+
+kind_cluster_name: devastation
+kind_version: v0.23.0
+kubectl_version: v1.30.2
+kind_node_image: kindest/node:v1.30.0
+kind_api_port: 6443
+
+gitlab_version: "17.1.1-ce.0"
+gitlab_hostname: "gitlab.{{ devastation_domain }}"
+gitlab_external_url: "https://{{ gitlab_hostname }}"
+gitlab_ssh_port: 2222
+gitlab_http_port: 8080
+gitlab_https_port: 8443
+gitlab_allow_existing_data: false
+gitlab_migration_enabled: false
+gitlab_backup_tar: ""
+gitlab_old_config_path: ""
+gitlab_old_logs_path: ""
+gitlab_old_data_path: ""
+
+gitlab_runner_version: "alpine-v17.1.0"
+gitlab_runner_registration_token: ""
+gitlab_runner_executor: docker
+gitlab_runner_docker_image: docker:27
+gitlab_runner_mount_docker_socket: false
+gitlab_runner_tags: "local,devastation,docker"
+
+validation_run_acceptance: false

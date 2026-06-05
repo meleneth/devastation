@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -x /usr/local/bin/devastation-validate ]]; then
+  exec /usr/local/bin/devastation-validate "$@"
+fi
+
+echo "/usr/local/bin/devastation-validate is not installed yet. Run ./bin/devastation-up first."
+exit 1

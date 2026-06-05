@@ -1,0 +1,44 @@
+---
+- name: Create GitLab Runner config directory
+  ansible.builtin.file:
+    path: "{{ devastation_paths.gitlab_runner }}/config"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Start GitLab Runner service
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - gitlab-runner
+    state: present
+
+- name: Check whether GitLab Runner is already configured
+  ansible.builtin.stat:
+    path: "{{ devastation_paths.gitlab_runner }}/config/config.toml"
+  register: runner_config
+
+- name: Register GitLab Runner when token is supplied
+  ansible.builtin.command: >-
+    docker compose -f {{ devastation_paths.compose }}/compose.yml exec -T gitlab-runner
+    gitlab-runner register --non-interactive
+    --url {{ gitlab_external_url }}
+    --registration-token {{ gitlab_runner_registration_token }}
+    --executor {{ gitlab_runner_executor }}
+    --docker-image {{ gitlab_runner_docker_image }}
+    --description runner.{{ devastation_domain }}
+    --tag-list {{ gitlab_runner_tags }}
+  no_log: true
+  when:
+    - gitlab_runner_registration_token | length > 0
+    - not runner_config.stat.exists
+
+- name: Print manual GitLab Runner registration steps
+  ansible.builtin.debug:
+    msg:
+      - "No gitlab_runner_registration_token supplied."
+      - "Create a runner token in GitLab, then rerun with -e gitlab_runner_registration_token=TOKEN."
+  when:
+    - gitlab_runner_registration_token | length == 0
+    - not runner_config.stat.exists

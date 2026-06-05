@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DOMAIN="{{ devastation_domain }}"
+REGISTRY="registry.${DOMAIN}"
+QUICK=0
+if [[ "${1:-}" == "--quick" ]]; then
+  QUICK=1
+fi
+
+check() {
+  local name="$1"
+  shift
+  if "$@" >/tmp/devastation-check.out 2>&1; then
+    printf '[ok] %s\n' "$name"
+  else
+    printf '[fail] %s\n' "$name"
+    sed 's/^/  /' /tmp/devastation-check.out
+    return 1
+  fi
+}
+
+status=0
+for host in dns ca registry apt-cache gitlab runner kind grafana jaeger prometheus; do
+  check "dns ${host}.${DOMAIN}" getent hosts "${host}.${DOMAIN}" || status=1
+done
+
+check "host CA trust" test -f /usr/local/share/ca-certificates/devastation-root-ca.crt || status=1
+check "Docker running" docker info || status=1
+check "registry reachable" curl -fsS "https://${REGISTRY}/v2/" || status=1
+check "apt cache reachable" curl -fsS "http://apt-cache.${DOMAIN}:{{ apt_cache_port }}/acng-report.html" || status=1
+check "KIND cluster listed" kind get clusters || status=1
+check "kubectl cluster-info" kubectl cluster-info || status=1
+check "GitLab web reachable" curl -kfsS "{{ gitlab_external_url }}/-/health" || status=1
+check "runner container running" docker compose -f "{{ devastation_paths.compose }}/compose.yml" ps --status running gitlab-runner || status=1
+check "neovim installed" nvim --version || status=1
+
+if [[ "$QUICK" == "0" ]]; then
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  cat >"${tmp}/Dockerfile" <<'DOCKERFILE'
+FROM alpine:3.20
+CMD ["sh", "-c", "echo devastation-local && sleep 3600"]
+DOCKERFILE
+  image="${REGISTRY}/devastation/hello:local"
+  check "build local registry test image" docker build -t "$image" "$tmp" || status=1
+  check "push local registry test image" docker push "$image" || status=1
+  check "pull local registry test image" docker pull "$image" || status=1
+  kubectl delete namespace devastation-validate --ignore-not-found >/dev/null 2>&1 || true
+  check "create validation namespace" kubectl create namespace devastation-validate || status=1
+  check "run registry image in KIND" kubectl -n devastation-validate run hello --image="$image" --restart=Never || status=1
+  check "wait for validation pod" kubectl -n devastation-validate wait --for=condition=Ready pod/hello --timeout=180s || status=1
+  check "KIND resolves internal services" kubectl -n devastation-validate run dnscheck --image=busybox:1.36 --restart=Never --rm -i -- nslookup gitlab.${DOMAIN} || status=1
+fi
+
+exit "$status"

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+name="${1:-}"
+if [[ -z "$name" ]]; then
+  echo "Usage: $0 hostname.deva.station"
+  exit 2
+fi
+
+case "$name" in
+  *.deva.station) ;;
+  *)
+    echo "Refusing to mint outside deva.station: $name"
+    exit 2
+    ;;
+esac
+
+base="/srv/devastation"
+cert_dir="${base}/certs/${name}"
+ca_dir="${base}/ca"
+sudo install -d -m 0755 "$cert_dir"
+
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+cat >"$tmp" <<EOF
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = req_ext
+prompt = no
+
+[req_distinguished_name]
+C = US
+O = devastation
+CN = ${name}
+
+[req_ext]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${name}
+EOF
+
+sudo openssl genrsa -out "${cert_dir}/tls.key" 2048
+sudo chmod 0600 "${cert_dir}/tls.key"
+sudo openssl req -new -key "${cert_dir}/tls.key" -out "${cert_dir}/tls.csr" -config "$tmp"
+sudo openssl x509 -req -in "${cert_dir}/tls.csr" -CA "${ca_dir}/root-ca.crt" -CAkey "${ca_dir}/root-ca.key" -CAcreateserial -out "${cert_dir}/tls.crt" -days 825 -sha256 -extensions req_ext -extfile "$tmp"
+
+echo "Minted ${cert_dir}/tls.crt and ${cert_dir}/tls.key"

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+backup="${1:-}"
+if [[ -z "$backup" ]]; then
+  echo "Usage: $0 /path/to/gitlab_backup.tar"
+  exit 2
+fi
+
+if [[ ! -f "$backup" ]]; then
+  echo "Backup not found: $backup"
+  exit 1
+fi
+
+compose="${DEVASTATION_COMPOSE_FILE:-/srv/devastation/compose/compose.yml}"
+name="$(basename "$backup")"
+stamp="${name%%_gitlab_backup.tar}"
+
+echo "This will stop GitLab write services and restore ${backup} into the local GitLab container."
+read -r -p "Type RESTORE to continue: " confirm
+if [[ "$confirm" != "RESTORE" ]]; then
+  echo "Restore cancelled."
+  exit 1
+fi
+
+docker compose -f "$compose" cp "$backup" "gitlab:/var/opt/gitlab/backups/${name}"
+docker compose -f "$compose" exec -T gitlab gitlab-ctl stop puma
+docker compose -f "$compose" exec -T gitlab gitlab-ctl stop sidekiq
+docker compose -f "$compose" exec -T gitlab gitlab-backup restore BACKUP="$stamp" force=yes
+docker compose -f "$compose" exec -T gitlab gitlab-ctl reconfigure
+docker compose -f "$compose" exec -T gitlab gitlab-ctl restart
+echo "Restore completed for ${name}."

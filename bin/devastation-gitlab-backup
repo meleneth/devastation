@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+compose="${DEVASTATION_COMPOSE_FILE:-/srv/devastation/compose/compose.yml}"
+backup_dir="${DEVASTATION_GITLAB_BACKUP_DIR:-/srv/devastation/gitlab/backups}"
+
+sudo install -d -m 0750 "$backup_dir"
+docker compose -f "$compose" exec -T gitlab gitlab-backup create
+echo "GitLab application backup requested. Check ${backup_dir} and GitLab logs for completion details."

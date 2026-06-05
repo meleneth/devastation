@@ -1,0 +1,50 @@
+---
+- name: Create CA directory
+  ansible.builtin.file:
+    path: "{{ devastation_paths.ca }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Generate local root CA private key
+  ansible.builtin.command:
+    cmd: "openssl genrsa -out {{ devastation_paths.ca }}/root-ca.key 4096"
+    creates: "{{ devastation_paths.ca }}/root-ca.key"
+
+- name: Protect local root CA key
+  ansible.builtin.file:
+    path: "{{ devastation_paths.ca }}/root-ca.key"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Generate local root CA certificate
+  ansible.builtin.command:
+    cmd: >-
+      openssl req -x509 -new -nodes -key {{ devastation_paths.ca }}/root-ca.key
+      -sha256 -days 3650
+      -subj "/C={{ cert_subject_country }}/O=devastation/CN={{ ca_common_name }}"
+      -out {{ devastation_paths.ca }}/root-ca.crt
+    creates: "{{ devastation_paths.ca }}/root-ca.crt"
+
+- name: Install local root CA into host trust store
+  ansible.builtin.copy:
+    src: "{{ devastation_paths.ca }}/root-ca.crt"
+    dest: /usr/local/share/ca-certificates/devastation-root-ca.crt
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  when: ca_install_host_trust
+  notify: Update ca certificates
+
+- name: Generate service leaf certificates
+  ansible.builtin.include_tasks: service_cert.yml
+  loop:
+    - "ca.{{ devastation_domain }}"
+    - "registry.{{ devastation_domain }}"
+    - "apt-cache.{{ devastation_domain }}"
+    - "gitlab.{{ devastation_domain }}"
+  loop_control:
+    loop_var: cert_name

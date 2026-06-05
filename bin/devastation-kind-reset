@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cluster="${DEVASTATION_KIND_CLUSTER:-devastation}"
+config="${DEVASTATION_KIND_CONFIG:-/srv/devastation/kind/kind-config.yml}"
+image="${DEVASTATION_KIND_IMAGE:-kindest/node:v1.30.0}"
+
+kind delete cluster --name "$cluster"
+kind create cluster --name "$cluster" --config "$config" --image "$image"
+echo "KIND cluster reset: $cluster"

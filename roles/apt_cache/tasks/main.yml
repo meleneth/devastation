@@ -1,0 +1,24 @@
+---
+- name: Create apt cache directory
+  ansible.builtin.file:
+    path: "{{ devastation_paths.apt_cache }}/data"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Start apt cache service
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - apt-cache
+    state: present
+
+- name: Configure host apt to use local cache
+  ansible.builtin.template:
+    src: apt-devastation-proxy.conf.j2
+    dest: /etc/apt/apt.conf.d/01devastation-proxy
+    owner: root
+    group: root
+    mode: "0644"
+  when: apt_cache_configure_host

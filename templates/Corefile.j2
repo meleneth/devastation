@@ -1,0 +1,23 @@
+{{ devastation_domain }}:53 {
+    errors
+    log
+    hosts {
+        {{ devastation_subnets.dns }} dns.{{ devastation_domain }}
+        {{ devastation_subnets.ca }} ca.{{ devastation_domain }}
+        {{ devastation_subnets.registry }} registry.{{ devastation_domain }}
+        {{ devastation_subnets.apt_cache }} apt-cache.{{ devastation_domain }}
+        {{ devastation_subnets.gitlab }} gitlab.{{ devastation_domain }}
+        {{ devastation_subnets.runner }} runner.{{ devastation_domain }}
+        {{ devastation_subnets.kind }} kind.{{ devastation_domain }}
+        {{ devastation_subnets.service_gateway }} grafana.{{ devastation_domain }}
+        {{ devastation_subnets.service_gateway }} jaeger.{{ devastation_domain }}
+        {{ devastation_subnets.service_gateway }} prometheus.{{ devastation_domain }}
+        fallthrough
+    }
+}
+
+.:53 {
+    errors
+    cache 30
+    forward . {{ dns_upstream_resolvers | join(' ') }}
+}

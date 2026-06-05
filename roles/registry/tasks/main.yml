@@ -1,0 +1,53 @@
+---
+- name: Create registry directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ devastation_paths.registry }}"
+    - "{{ devastation_paths.registry }}/data"
+    - "{{ devastation_paths.registry }}/pull-through-cache"
+
+- name: Create registry auth directory
+  ansible.builtin.file:
+    path: "{{ devastation_paths.registry }}/auth"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  when: registry_enable_auth
+
+- name: Start registry services
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - registry
+    state: present
+
+- name: Start registry pull-through cache
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - registry-cache
+    state: present
+  when: registry_pull_through_cache_enabled
+
+- name: Ensure Docker certificate trust directory exists
+  ansible.builtin.file:
+    path: /etc/docker/certs.d/registry.{{ devastation_domain }}
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Trust local CA for Docker registry
+  ansible.builtin.copy:
+    src: "{{ devastation_paths.ca }}/root-ca.crt"
+    dest: /etc/docker/certs.d/registry.{{ devastation_domain }}/ca.crt
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"

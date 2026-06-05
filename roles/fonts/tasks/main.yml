@@ -1,0 +1,24 @@
+---
+- name: Install font tooling
+  ansible.builtin.apt:
+    name:
+      - fontconfig
+    state: present
+
+- name: Create MesloLGS Nerd Font directory
+  ansible.builtin.file:
+    path: "{{ meslo_lgs_nerd_font_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install MesloLGS Nerd Font files
+  ansible.builtin.get_url:
+    url: "https://github.com/ryanoasis/nerd-fonts/raw/{{ meslo_lgs_nerd_font_version }}/patched-fonts/Meslo/S/{{ item | replace(' ', '%20') }}"
+    dest: "{{ meslo_lgs_nerd_font_dir }}/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ meslo_lgs_nerd_font_files }}"
+  notify: Refresh font cache

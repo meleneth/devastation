@@ -1,0 +1,18 @@
+---
+- name: Install validation script
+  ansible.builtin.template:
+    src: devastation-validate.j2
+    dest: /usr/local/bin/devastation-validate
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Run lightweight validation
+  ansible.builtin.command: /usr/local/bin/devastation-validate --quick
+  register: validation_result
+  changed_when: false
+  failed_when: false
+
+- name: Show validation summary
+  ansible.builtin.debug:
+    var: validation_result.stdout_lines

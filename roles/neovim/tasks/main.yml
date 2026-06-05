@@ -1,0 +1,34 @@
+---
+- name: Install Neovim
+  ansible.builtin.apt:
+    name: neovim
+    state: present
+
+- name: Check for existing Neovim config
+  ansible.builtin.stat:
+    path: "{{ neovim_config_dir }}/init.lua"
+  become: true
+  become_user: "{{ devastation_user }}"
+  register: neovim_init
+
+- name: Create Neovim config directory when absent
+  ansible.builtin.file:
+    path: "{{ neovim_config_dir }}"
+    state: directory
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0755"
+  when:
+    - neovim_create_config_if_missing
+    - not neovim_init.stat.exists
+
+- name: Install minimal Neovim config when absent
+  ansible.builtin.template:
+    src: init.lua.j2
+    dest: "{{ neovim_config_dir }}/init.lua"
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+  when:
+    - neovim_create_config_if_missing
+    - not neovim_init.stat.exists

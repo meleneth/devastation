@@ -1,0 +1,80 @@
+---
+- name: Check kind binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/kind
+  register: kind_binary
+
+- name: Install kind when missing
+  ansible.builtin.get_url:
+    url: "https://kind.sigs.k8s.io/dl/{{ kind_version }}/kind-linux-amd64"
+    dest: /usr/local/bin/kind
+    mode: "0755"
+  when: not kind_binary.stat.exists
+
+- name: Check kubectl binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/kubectl
+  register: kubectl_binary
+
+- name: Install kubectl when missing
+  ansible.builtin.get_url:
+    url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/amd64/kubectl"
+    dest: /usr/local/bin/kubectl
+    mode: "0755"
+  when: not kubectl_binary.stat.exists
+
+- name: Create KIND config directory
+  ansible.builtin.file:
+    path: "{{ devastation_paths.kind }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write KIND cluster config
+  ansible.builtin.template:
+    src: kind-config.yml.j2
+    dest: "{{ devastation_paths.kind }}/kind-config.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Check for existing KIND cluster
+  ansible.builtin.command: "kind get clusters"
+  register: kind_clusters
+  changed_when: false
+
+- name: Create KIND cluster
+  ansible.builtin.command: "kind create cluster --name {{ kind_cluster_name }} --config {{ devastation_paths.kind }}/kind-config.yml --image {{ kind_node_image }}"
+  when: "kind_cluster_name not in kind_clusters.stdout_lines"
+
+- name: Get KIND nodes
+  ansible.builtin.command: "kind get nodes --name {{ kind_cluster_name }}"
+  register: kind_nodes
+  changed_when: false
+
+- name: Connect KIND nodes to devastation network
+  ansible.builtin.command: "docker network connect devastation {{ item }}"
+  loop: "{{ kind_nodes.stdout_lines }}"
+  register: kind_network_connect
+  changed_when: kind_network_connect.rc == 0
+  failed_when:
+    - kind_network_connect.rc != 0
+    - "'already exists' not in kind_network_connect.stderr"
+
+- name: Configure registry trust inside KIND nodes
+  ansible.builtin.shell: |
+    set -eu
+    node="{{ item }}"
+    docker exec "$node" mkdir -p /etc/containerd/certs.d/registry.{{ devastation_domain }}
+    docker cp {{ devastation_paths.ca }}/root-ca.crt "$node":/etc/containerd/certs.d/registry.{{ devastation_domain }}/ca.crt
+    docker exec "$node" sh -c 'printf "%s\n" \
+      "server = \"https://registry.{{ devastation_domain }}\"" \
+      "" \
+      "[host.\"https://registry.{{ devastation_domain }}\"]" \
+      "  capabilities = [\"pull\", \"resolve\"]" \
+      "  ca = \"/etc/containerd/certs.d/registry.{{ devastation_domain }}/ca.crt\"" \
+      > /etc/containerd/certs.d/registry.{{ devastation_domain }}/hosts.toml'
+    docker exec "$node" systemctl restart containerd
+  loop: "{{ kind_nodes.stdout_lines }}"
+  changed_when: true

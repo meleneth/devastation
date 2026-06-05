@@ -1,0 +1,22 @@
+---
+- name: Refresh apt metadata
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Build base package list
+  ansible.builtin.set_fact:
+    base_packages_effective: "{{ base_packages_default + (['nodejs', 'npm'] if install_nodejs_from_distro else []) + base_packages_extra }}"
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ base_packages_effective }}"
+    state: present
+
+- name: Ensure pipx path is available for target user
+  ansible.builtin.command: pipx ensurepath
+  become: true
+  become_user: "{{ devastation_user }}"
+  register: pipx_ensurepath
+  changed_when: "'Success' in pipx_ensurepath.stdout"
+  failed_when: false
