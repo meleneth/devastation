@@ -91,6 +91,7 @@ These names are served under `deva.station`:
 - `node-exporter.deva.station`
 - `cadvisor.deva.station`
 - `vault.deva.station`
+- `eventline.deva.station`
 - `test-db.deva.station`
 - `development-db.deva.station`
 - `production-db.deva.station`
@@ -186,6 +187,7 @@ New hostnames require a full automated rotation because there is no retained CA 
 The compose project includes local dev data services and an observability stack:
 
 - Vault dev server: `http://vault.deva.station:8200`, root token `devastation`
+- Eventline GoAWS SNS/SQS emulator: `http://eventline.deva.station:4100`
 - Postgres 18 containers: `test-db`, `development-db`, `production-db`, and `otel-db`
 - Grafana: `http://grafana.deva.station:3000`, admin password `devastation`
 - Prometheus: `http://prometheus.deva.station:9090`

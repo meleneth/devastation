@@ -33,6 +33,7 @@ check "registry reachable" curl -fsS "https://${REGISTRY}/v2/" || status=1
 check "registry metrics reachable" curl -fsS "http://${REGISTRY}:{{ registry_metrics_port }}/metrics" || status=1
 check "apt cache reachable" curl -fsS "http://apt-cache.${DOMAIN}:{{ apt_cache_port }}/acng-report.html" || status=1
 check "Vault reachable" curl -fsS "http://vault.${DOMAIN}:{{ vault_port }}/v1/sys/health" || status=1
+check "eventline GoAWS reachable" nc -z "eventline.${DOMAIN}" {{ goaws_port }} || status=1
 check "Prometheus reachable" curl -fsS "http://prometheus.${DOMAIN}:{{ prometheus_port }}/-/ready" || status=1
 check "Grafana reachable" curl -fsS "http://grafana.${DOMAIN}:{{ grafana_port }}/api/health" || status=1
 check "Jaeger reachable" curl -fsS "http://jaeger.${DOMAIN}:{{ jaeger_ui_port }}/" || status=1

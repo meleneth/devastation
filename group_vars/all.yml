@@ -22,6 +22,7 @@ devastation_subnets:
   node_exporter: 172.30.42.23
   cadvisor: 172.30.42.24
   vault: 172.30.42.25
+  eventline: 172.30.42.26
   test_db: 172.30.42.31
   development_db: 172.30.42.32
   production_db: 172.30.42.33
@@ -60,6 +61,8 @@ devastation_dns_records:
     ip: "{{ devastation_subnets.cadvisor }}"
   - name: "vault.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.vault }}"
+  - name: "eventline.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.eventline }}"
   - name: "test-db.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.test_db }}"
   - name: "development-db.{{ devastation_domain }}"
@@ -86,6 +89,7 @@ devastation_internal_hostnames:
   - "node-exporter.{{ devastation_domain }}"
   - "cadvisor.{{ devastation_domain }}"
   - "vault.{{ devastation_domain }}"
+  - "eventline.{{ devastation_domain }}"
   - "test-db.{{ devastation_domain }}"
   - "development-db.{{ devastation_domain }}"
   - "production-db.{{ devastation_domain }}"
@@ -104,6 +108,7 @@ devastation_paths:
   gitlab_runner: "{{ devastation_root }}/gitlab-runner"
   observability: "{{ devastation_root }}/observability"
   vault: "{{ devastation_root }}/vault"
+  eventline: "{{ devastation_root }}/eventline"
   postgres: "{{ devastation_root }}/postgres"
   logs: "{{ devastation_root }}/logs"
 
@@ -284,6 +289,8 @@ postgres_databases:
 vault_version: "1.19.5"
 vault_dev_root_token: devastation
 vault_port: 8200
+goaws_image: admiralpiett/goaws:v0.5.4
+goaws_port: 4100
 
 grafana_image: grafana/grafana-enterprise:latest
 grafana_admin_user: admin

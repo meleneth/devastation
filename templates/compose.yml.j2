@@ -86,6 +86,15 @@ services:
       devastation:
         ipv4_address: {{ devastation_subnets.vault }}
 
+  eventline:
+    image: {{ goaws_image }}
+    restart: unless-stopped
+    ports:
+      - "{{ goaws_port }}:4100"
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.eventline }}
+
 {% for pg in postgres_databases %}
   {{ pg.service }}:
     image: postgres:{{ postgres_version }}

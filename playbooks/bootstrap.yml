@@ -34,6 +34,7 @@
         - { path: "{{ devastation_paths.compose }}", mode: "0755" }
         - { path: "{{ devastation_paths.observability }}", mode: "0755" }
         - { path: "{{ devastation_paths.vault }}", mode: "0755" }
+        - { path: "{{ devastation_paths.eventline }}", mode: "0755" }
         - { path: "{{ devastation_paths.postgres }}", mode: "0755" }
         - { path: "{{ devastation_paths.logs }}", mode: "0755" }
 
@@ -102,6 +103,10 @@
     - name: Apply datastore role
       ansible.builtin.import_role:
         name: datastores
+
+    - name: Apply eventline role
+      ansible.builtin.import_role:
+        name: eventline
 
     - name: Apply observability role
       ansible.builtin.import_role:
