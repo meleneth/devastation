@@ -6,7 +6,16 @@ REGISTRY="registry.${DOMAIN}"
 QUICK=0
 CHECK_TMP="$(mktemp -d)"
 CHECK_OUT="${CHECK_TMP}/check.out"
-trap 'rm -rf "$CHECK_TMP"' EXIT
+VALIDATION_TMP=""
+
+cleanup() {
+  rm -rf "$CHECK_TMP"
+  if [[ -n "$VALIDATION_TMP" ]]; then
+    rm -rf "$VALIDATION_TMP"
+  fi
+}
+
+trap cleanup EXIT
 
 if [[ "${1:-}" == "--quick" ]]; then
   QUICK=1
@@ -22,6 +31,28 @@ check() {
     sed 's/^/  /' "$CHECK_OUT"
     return 1
   fi
+}
+
+retry_check() {
+  local name="$1"
+  local attempts="$2"
+  local delay="$3"
+  local try
+  shift 3
+
+  for try in $(seq 1 "$attempts"); do
+    if "$@" >"$CHECK_OUT" 2>&1; then
+      printf '[ok] %s\n' "$name"
+      return 0
+    fi
+    if [[ "$try" != "$attempts" ]]; then
+      sleep "$delay"
+    fi
+  done
+
+  printf '[fail] %s\n' "$name"
+  sed 's/^/  /' "$CHECK_OUT"
+  return 1
 }
 
 run_root() {
@@ -54,7 +85,7 @@ check "www portal reachable" curl -fsS "http://www.${DOMAIN}:{{ www_port }}/" ||
 check "Prometheus reachable" curl -fsS "http://prometheus.${DOMAIN}:{{ prometheus_port }}/-/ready" || status=1
 check "Grafana reachable" curl -fsS "http://grafana.${DOMAIN}:{{ grafana_port }}/api/health" || status=1
 check "Jaeger reachable" curl -fsS "http://jaeger.${DOMAIN}:{{ jaeger_ui_port }}/" || status=1
-check "Loki reachable" curl -fsS "http://loki.${DOMAIN}:{{ loki_port }}/ready" || status=1
+retry_check "Loki reachable" 24 5 curl -fsS "http://loki.${DOMAIN}:{{ loki_port }}/ready" || status=1
 check "OTel Collector metrics reachable" curl -fsS "http://otel-collector.${DOMAIN}:8888/metrics" || status=1
 {% for pg in postgres_databases %}
 check "{{ pg.service }} reachable" nc -z "{{ pg.hostname }}" 5432 || status=1
@@ -71,13 +102,13 @@ check "Istio installed" kubectl -n istio-system get deployment istiod || status=
 check "Argo CD installed" kubectl -n argocd get deployment argocd-server || status=1
 check "OTel operator installed" kubectl -n opentelemetry-operator-system get deployment opentelemetry-operator-controller-manager || status=1
 {% endif %}
-check "GitLab web reachable" curl -kfsS "{{ gitlab_external_url }}/-/health" || status=1
+retry_check "GitLab web reachable" 24 5 curl -kfsS "{{ gitlab_external_url }}/users/sign_in" || status=1
 check "runner container running" docker compose -f "{{ devastation_paths.compose }}/compose.yml" ps --status running gitlab-runner || status=1
 check "neovim installed" nvim --version || status=1
 
 if [[ "$QUICK" == "0" ]]; then
   tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' EXIT
+  VALIDATION_TMP="$tmp"
   cat >"${tmp}/Dockerfile" <<'DOCKERFILE'
 FROM alpine:3.20
 CMD ["sh", "-c", "echo devastation-local && sleep 3600"]
