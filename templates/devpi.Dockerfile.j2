@@ -1,0 +1,11 @@
+FROM {{ pypi_cache_base_image }}
+
+ARG DEVPI_SERVER_VERSION={{ devpi_server_version }}
+
+RUN python -m pip install --no-cache-dir \
+  "devpi-server==${DEVPI_SERVER_VERSION}" \
+  devpi-web
+
+EXPOSE {{ pypi_cache_port }}
+
+CMD ["devpi-server", "--serverdir", "/data", "--host", "0.0.0.0", "--port", "{{ pypi_cache_port }}"]

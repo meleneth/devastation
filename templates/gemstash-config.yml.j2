@@ -1,0 +1,8 @@
+base_path: /gemstash/data
+bind: tcp://0.0.0.0:{{ gem_cache_port }}
+rubygems_url: {{ gem_cache_upstream }}
+db_adapter: sqlite3
+cache_type: memory
+cache_expiration: 1800
+cache_max_size: 500
+log_file: ":stdout"

@@ -1,0 +1,91 @@
+---
+- name: Create package cache directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop:
+    - { path: "{{ devastation_paths.package_caches }}" }
+    - { path: "{{ devastation_paths.package_caches }}/verdaccio" }
+    - { path: "{{ devastation_paths.package_caches }}/verdaccio/conf", owner: "10001", group: "65533" }
+    - { path: "{{ devastation_paths.package_caches }}/verdaccio/storage", owner: "10001", group: "65533" }
+    - { path: "{{ devastation_paths.package_caches }}/verdaccio/plugins", owner: "10001", group: "65533" }
+    - { path: "{{ devastation_paths.package_caches }}/devpi" }
+    - { path: "{{ devastation_paths.package_caches }}/devpi/build" }
+    - { path: "{{ devastation_paths.package_caches }}/devpi/data" }
+    - { path: "{{ devastation_paths.package_caches }}/gemstash" }
+    - { path: "{{ devastation_paths.package_caches }}/gemstash/build" }
+    - { path: "{{ devastation_paths.package_caches }}/gemstash/data" }
+
+- name: Write Verdaccio configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/verdaccio-config.yaml.j2"
+    dest: "{{ devastation_paths.package_caches }}/verdaccio/conf/config.yaml"
+    owner: "10001"
+    group: "65533"
+    mode: "0644"
+
+- name: Write Gemstash configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/gemstash-config.yml.j2"
+    dest: "{{ devastation_paths.package_caches }}/gemstash/config.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write devpi image Dockerfile
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/devpi.Dockerfile.j2"
+    dest: "{{ devastation_paths.package_caches }}/devpi/build/Dockerfile"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write Gemstash image Dockerfile
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/gemstash.Dockerfile.j2"
+    dest: "{{ devastation_paths.package_caches }}/gemstash/build/Dockerfile"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Build devpi cache image
+  community.docker.docker_image:
+    name: "{{ pypi_cache_image }}"
+    source: build
+    build:
+      path: "{{ devastation_paths.package_caches }}/devpi/build"
+      network: "{{ package_cache_build_network }}"
+      args:
+        DEVPI_SERVER_VERSION: "{{ devpi_server_version }}"
+
+- name: Build Gemstash cache image
+  community.docker.docker_image:
+    name: "{{ gem_cache_image }}"
+    source: build
+    build:
+      path: "{{ devastation_paths.package_caches }}/gemstash/build"
+      network: "{{ package_cache_build_network }}"
+      args:
+        GEMSTASH_VERSION: "{{ gemstash_version }}"
+
+- name: Start language package cache services
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - npm-cache
+      - pypi-cache
+      - gem-cache
+    state: present
+
+- name: Wait for language package caches
+  ansible.builtin.wait_for:
+    host: "{{ item.host }}"
+    port: "{{ item.port }}"
+    timeout: 60
+  loop:
+    - { host: "npm-cache.{{ devastation_domain }}", port: "{{ npm_cache_port }}" }
+    - { host: "pypi-cache.{{ devastation_domain }}", port: "{{ pypi_cache_port }}" }
+    - { host: "gem-cache.{{ devastation_domain }}", port: "{{ gem_cache_port }}" }

@@ -13,6 +13,9 @@ devastation_subnets:
   gitlab: 172.30.42.14
   runner: 172.30.42.15
   registry_cache: 172.30.42.16
+  npm_cache: 172.30.42.28
+  pypi_cache: 172.30.42.29
+  gem_cache: 172.30.42.30
   otel_collector: 172.30.42.17
   prometheus: 172.30.42.18
   jaeger: 172.30.42.19
@@ -43,6 +46,12 @@ devastation_dns_records:
     ip: "{{ devastation_subnets.registry_cache }}"
   - name: "apt-cache.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.apt_cache }}"
+  - name: "npm-cache.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.npm_cache }}"
+  - name: "pypi-cache.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.pypi_cache }}"
+  - name: "gem-cache.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.gem_cache }}"
   - name: "gitlab.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.gitlab }}"
   - name: "runner.{{ devastation_domain }}"
@@ -87,6 +96,9 @@ devastation_internal_hostnames:
   - "registry.{{ devastation_domain }}"
   - "registry-cache.{{ devastation_domain }}"
   - "apt-cache.{{ devastation_domain }}"
+  - "npm-cache.{{ devastation_domain }}"
+  - "pypi-cache.{{ devastation_domain }}"
+  - "gem-cache.{{ devastation_domain }}"
   - "gitlab.{{ devastation_domain }}"
   - "runner.{{ devastation_domain }}"
   - "kind.{{ devastation_domain }}"
@@ -114,6 +126,7 @@ devastation_paths:
   dns: "{{ devastation_root }}/dns"
   registry: "{{ devastation_root }}/registry"
   apt_cache: "{{ devastation_root }}/apt-cache"
+  package_caches: "{{ devastation_root }}/package-caches"
   kind: "{{ devastation_root }}/kind"
   gitlab: "{{ devastation_root }}/gitlab"
   gitlab_runner: "{{ devastation_root }}/gitlab-runner"
@@ -248,6 +261,36 @@ apt_cache_prefetch_images:
   - ubuntu:24.04
   - alpine:3.20
   - kindest/node:v1.30.0
+
+npm_cache_image: verdaccio/verdaccio:6
+npm_cache_port: 4873
+npm_cache_upstream: https://registry.npmjs.org/
+npm_cache_prefetch_packages:
+  - typescript
+  - vite
+  - eslint
+
+package_cache_build_network: host
+
+pypi_cache_base_image: python:3.13-slim
+pypi_cache_image: devastation/devpi-cache:6.20.0
+pypi_cache_port: 3141
+pypi_cache_password: devastation
+devpi_server_version: 6.20.0
+pypi_cache_prefetch_packages:
+  - pip
+  - setuptools
+  - wheel
+  - requests
+
+gem_cache_base_image: ruby:3.3-slim
+gem_cache_image: devastation/gemstash-cache:2.8.2
+gem_cache_port: 9292
+gemstash_version: 2.8.2
+gem_cache_upstream: https://rubygems.org
+gem_cache_prefetch_packages:
+  - bundler
+  - rake
 
 kind_cluster_name: devastation
 kind_version: v0.23.0

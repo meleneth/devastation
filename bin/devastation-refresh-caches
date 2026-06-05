@@ -3,6 +3,16 @@ set -euo pipefail
 
 PACKAGES="${DEVASTATION_APT_PREFETCH_PACKAGES:-git curl ca-certificates build-essential python3 python3-venv jq ripgrep neovim}"
 IMAGES="${DEVASTATION_IMAGE_PREFETCH:-debian:bookworm-slim ubuntu:24.04 alpine:3.20 kindest/node:v1.30.0}"
+NPM_PACKAGES="${DEVASTATION_NPM_PREFETCH_PACKAGES:-typescript vite eslint}"
+PYTHON_PACKAGES="${DEVASTATION_PYPI_PREFETCH_PACKAGES:-pip setuptools wheel requests}"
+GEM_PACKAGES="${DEVASTATION_GEM_PREFETCH_PACKAGES:-bundler rake}"
+
+NPM_REGISTRY="${DEVASTATION_NPM_REGISTRY:-http://npm-cache.deva.station:4873}"
+PIP_INDEX_URL="${DEVASTATION_PIP_INDEX_URL:-http://pypi-cache.deva.station:3141/root/pypi/+simple/}"
+GEM_SOURCE="${DEVASTATION_GEM_SOURCE:-http://gem-cache.deva.station:9292}"
+NPM_DOWNLOAD_DIR="${DEVASTATION_NPM_DOWNLOAD_DIR:-/tmp/devastation-npm-cache-warm}"
+PIP_DOWNLOAD_DIR="${DEVASTATION_PIP_DOWNLOAD_DIR:-/tmp/devastation-pip-cache-warm}"
+GEM_DOWNLOAD_DIR="${DEVASTATION_GEM_DOWNLOAD_DIR:-/tmp/devastation-gem-cache-warm}"
 
 echo "Refreshing apt metadata through apt cache..."
 sudo apt-get update
@@ -14,5 +24,33 @@ echo "Prewarming container images: ${IMAGES}"
 for image in ${IMAGES}; do
   docker pull "$image"
 done
+
+if command -v npm >/dev/null 2>&1; then
+  echo "Prewarming npm packages through ${NPM_REGISTRY}: ${NPM_PACKAGES}"
+  mkdir -p "${NPM_DOWNLOAD_DIR}"
+  for package in ${NPM_PACKAGES}; do
+    npm pack --registry "${NPM_REGISTRY}" --pack-destination "${NPM_DOWNLOAD_DIR}" "${package}" >/dev/null
+  done
+else
+  echo "Skipping npm prewarm; npm is not installed."
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+  echo "Prewarming Python packages through ${PIP_INDEX_URL}: ${PYTHON_PACKAGES}"
+  mkdir -p "${PIP_DOWNLOAD_DIR}"
+  python3 -m pip download --disable-pip-version-check --dest "${PIP_DOWNLOAD_DIR}" --index-url "${PIP_INDEX_URL}" ${PYTHON_PACKAGES}
+else
+  echo "Skipping Python package prewarm; python3 is not installed."
+fi
+
+if command -v gem >/dev/null 2>&1; then
+  echo "Prewarming Ruby gems through ${GEM_SOURCE}: ${GEM_PACKAGES}"
+  mkdir -p "${GEM_DOWNLOAD_DIR}"
+  for package in ${GEM_PACKAGES}; do
+    (cd "${GEM_DOWNLOAD_DIR}" && gem fetch "${package}" --clear-sources --source "${GEM_SOURCE}" >/dev/null)
+  done
+else
+  echo "Skipping RubyGems prewarm; gem is not installed."
+fi
 
 echo "Cache refresh complete."

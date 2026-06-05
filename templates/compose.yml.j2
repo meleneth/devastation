@@ -68,6 +68,49 @@ services:
       devastation:
         ipv4_address: {{ devastation_subnets.apt_cache }}
 
+  npm-cache:
+    image: {{ npm_cache_image }}
+    restart: unless-stopped
+    environment:
+      VERDACCIO_PORT: "{{ npm_cache_port }}"
+      VERDACCIO_PUBLIC_URL: http://npm-cache.{{ devastation_domain }}:{{ npm_cache_port }}
+    volumes:
+      - {{ devastation_paths.package_caches }}/verdaccio/conf:/verdaccio/conf
+      - {{ devastation_paths.package_caches }}/verdaccio/storage:/verdaccio/storage
+      - {{ devastation_paths.package_caches }}/verdaccio/plugins:/verdaccio/plugins
+    ports:
+      - "{{ npm_cache_port }}:{{ npm_cache_port }}"
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.npm_cache }}
+
+  pypi-cache:
+    image: {{ pypi_cache_image }}
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - devpi-init --serverdir /data --root-passwd "{{ pypi_cache_password }}" || true; exec devpi-server --serverdir /data --host 0.0.0.0 --port {{ pypi_cache_port }}
+    volumes:
+      - {{ devastation_paths.package_caches }}/devpi/data:/data
+    ports:
+      - "{{ pypi_cache_port }}:{{ pypi_cache_port }}"
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.pypi_cache }}
+
+  gem-cache:
+    image: {{ gem_cache_image }}
+    restart: unless-stopped
+    volumes:
+      - {{ devastation_paths.package_caches }}/gemstash/config.yml:/gemstash/config.yml:ro
+      - {{ devastation_paths.package_caches }}/gemstash/data:/gemstash/data
+    ports:
+      - "{{ gem_cache_port }}:{{ gem_cache_port }}"
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.gem_cache }}
+
   vault:
     image: hashicorp/vault:{{ vault_version }}
     restart: unless-stopped

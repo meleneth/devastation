@@ -1,6 +1,6 @@
 # devastation
 
-`devastation` builds an idempotent local-first development environment for a Debian or Ubuntu laptop. It uses Ansible, Docker Compose, CoreDNS, an ephemeral local root CA workflow, a standalone Docker registry, a pull-through registry cache, apt-cacher-ng, KIND, GitLab CE, GitLab Runner, Neovim, Vault, Eventline GoAWS, MinIO, Postgres, and a prewired observability stack with Prometheus, Grafana, Loki, Jaeger, OpenTelemetry Collector, node-exporter, and cAdvisor.
+`devastation` builds an idempotent local-first development environment for a Debian or Ubuntu laptop. It uses Ansible, Docker Compose, CoreDNS, an ephemeral local root CA workflow, a standalone Docker registry, pull-through caches for Docker Hub, apt, npm, PyPI, and RubyGems, KIND, GitLab CE, GitLab Runner, Neovim, Vault, Eventline GoAWS, MinIO, Postgres, and a prewired observability stack with Prometheus, Grafana, Loki, Jaeger, OpenTelemetry Collector, node-exporter, and cAdvisor.
 
 The internal DNS root is `deva.station`.
 
@@ -15,6 +15,7 @@ Persistent state defaults to `/srv/devastation`:
 - `/srv/devastation/secrets`: generated secrets, mode `0700`
 - `/srv/devastation/registry`: standalone local registry data
 - `/srv/devastation/apt-cache`: apt-cacher-ng cache data
+- `/srv/devastation/package-caches`: Verdaccio, devpi, and Gemstash cache data/configuration
 - `/srv/devastation/kind`: KIND cluster config
 - `/srv/devastation/gitlab`: GitLab config, logs, and data
 - `/srv/devastation/gitlab-runner`: GitLab Runner config
@@ -32,7 +33,7 @@ The current feature set includes:
 - Private `deva.station` DNS and `/etc/hosts` records for every core service, plus an HTTPS portal at `deva.station` and `www.deva.station`
 - Ephemeral local root CA issuance with host, browser NSS, Docker, KIND, and GitLab Runner trust installation
 - Local HTTPS Docker registry plus Docker Hub pull-through cache
-- Host apt proxying through apt-cacher-ng
+- Package caching for apt, npm, PyPI, and RubyGems
 - KIND with local registry trust, cert-manager, Istio, Argo CD, and the OpenTelemetry Operator
 - Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Neovim, pyenv, rbenv, ruby-build, nvm, and MesloLGS Nerd Font
 - GitLab CE and a Docker-executor GitLab Runner
@@ -103,6 +104,9 @@ These names are served under `deva.station`:
 - `registry.deva.station`
 - `registry-cache.deva.station`
 - `apt-cache.deva.station`
+- `npm-cache.deva.station`
+- `pypi-cache.deva.station`
+- `gem-cache.deva.station`
 - `gitlab.deva.station`
 - `runner.deva.station`
 - `kind.deva.station`
@@ -142,6 +146,9 @@ Browser-friendly local links:
 - [Registry cache API](http://registry-cache.deva.station:5000/v2/)
 - [Registry cache metrics](http://registry-cache.deva.station:5001/metrics)
 - [Apt cache](http://apt-cache.deva.station:3142)
+- [npm cache](http://npm-cache.deva.station:4873)
+- [PyPI cache](http://pypi-cache.deva.station:3141/root/pypi/)
+- [RubyGems cache](http://gem-cache.deva.station:9292)
 - [OTel Collector metrics](http://otel-collector.deva.station:8888/metrics)
 - [OTel Collector Prometheus exporter](http://otel-collector.deva.station:9464/metrics)
 - [node-exporter metrics](http://node-exporter.deva.station:9100/metrics)
@@ -153,6 +160,9 @@ Non-browser endpoints:
 - OTLP HTTP: `http://otel-collector.deva.station:4318`
 - KIND Kubernetes API: `https://kind.deva.station:6443`
 - GitLab SSH: `ssh://git@gitlab.deva.station:2222`
+- npm registry: `http://npm-cache.deva.station:4873`
+- pip index: `http://pypi-cache.deva.station:3141/root/pypi/+simple/`
+- RubyGems source: `http://gem-cache.deva.station:9292`
 - Postgres test DB: `postgres://devastation:devastation@test-db.deva.station:5432/test_db`
 - Postgres development DB: `postgres://devastation:devastation@development-db.deva.station:5432/development_db`
 - Postgres production DB: `postgres://devastation:devastation@production-db.deva.station:5432/production_db`
@@ -198,6 +208,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 ```
 
 If a package is unavailable offline, apt will fail clearly. Refresh the cache when you next have fast internet.
+
+## Language Package Caches
+
+The environment also runs local proxy caches for common language ecosystems:
+
+- npm: `http://npm-cache.deva.station:4873` using Verdaccio
+- Python: `http://pypi-cache.deva.station:3141/root/pypi/+simple/` using devpi
+- Ruby: `http://gem-cache.deva.station:9292` using Gemstash
+
+Use these in local shells or automation:
+
+```bash
+npm config set registry http://npm-cache.deva.station:4873
+python3 -m pip config set global.index-url http://pypi-cache.deva.station:3141/root/pypi/+simple/
+bundle config set mirror.https://rubygems.org http://gem-cache.deva.station:9292
+gem sources --add http://gem-cache.deva.station:9292 --remove https://rubygems.org/
+```
+
+For one-off commands:
+
+```bash
+NPM_CONFIG_REGISTRY=http://npm-cache.deva.station:4873 npm install
+PIP_INDEX_URL=http://pypi-cache.deva.station:3141/root/pypi/+simple/ pip install requests
+bundle config set --local mirror.https://rubygems.org http://gem-cache.deva.station:9292 && bundle install
+gem install rake --source http://gem-cache.deva.station:9292
+```
+
+Share [AGENTS.md](AGENTS.md) with coding agents so they use the local caches instead of going directly to public package registries.
 
 ## DNS Notes
 

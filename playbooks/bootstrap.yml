@@ -36,6 +36,7 @@
         - { path: "{{ devastation_paths.vault }}", mode: "0755" }
         - { path: "{{ devastation_paths.eventline }}", mode: "0755" }
         - { path: "{{ devastation_paths.storage }}", mode: "0755" }
+        - { path: "{{ devastation_paths.package_caches }}", mode: "0755" }
         - { path: "{{ devastation_paths.www }}", mode: "0755" }
         - { path: "{{ devastation_paths.postgres }}", mode: "0755" }
         - { path: "{{ devastation_paths.logs }}", mode: "0755" }
@@ -97,6 +98,10 @@
     - name: Apply apt cache role
       ansible.builtin.import_role:
         name: apt_cache
+
+    - name: Apply package caches role
+      ansible.builtin.import_role:
+        name: package_caches
 
     - name: Apply Neovim role
       ansible.builtin.import_role:

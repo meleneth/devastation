@@ -1,0 +1,17 @@
+FROM {{ gem_cache_base_image }}
+
+ARG GEMSTASH_VERSION={{ gemstash_version }}
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    libsqlite3-dev \
+    sqlite3 \
+  && gem install gemstash -v "${GEMSTASH_VERSION}" --no-document \
+  && apt-get purge -y --auto-remove build-essential \
+  && rm -rf /var/lib/apt/lists/*
+
+EXPOSE {{ gem_cache_port }}
+
+CMD ["gemstash", "start", "--config-file", "/gemstash/config.yml"]

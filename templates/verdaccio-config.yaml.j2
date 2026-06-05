@@ -1,0 +1,35 @@
+storage: /verdaccio/storage
+plugins: /verdaccio/plugins
+
+web:
+  title: Devastation npm cache
+
+auth:
+  htpasswd:
+    file: /verdaccio/conf/htpasswd
+    max_users: 1000
+
+uplinks:
+  npmjs:
+    url: {{ npm_cache_upstream }}
+
+packages:
+  "@*/*":
+    access: $all
+    publish: $authenticated
+    unpublish: $authenticated
+    proxy: npmjs
+  "**":
+    access: $all
+    publish: $authenticated
+    unpublish: $authenticated
+    proxy: npmjs
+
+server:
+  keepAliveTimeout: 60
+
+middlewares:
+  audit:
+    enabled: true
+
+log: { type: stdout, format: pretty, level: http }
