@@ -54,13 +54,35 @@
   changed_when: false
 
 - name: Connect KIND nodes to devastation network
-  ansible.builtin.command: "docker network connect devastation {{ item }}"
+  ansible.builtin.shell: |
+    set -eu
+    node="{{ item }}"
+    control_plane="{{ kind_cluster_name }}-control-plane"
+    current="$(docker inspect "$node" | jq -r '.[0].NetworkSettings.Networks.devastation.IPAddress // ""')"
+
+    if [ "$node" = "$control_plane" ]; then
+      wanted="{{ devastation_subnets.kind }}"
+      if [ "$current" = "$wanted" ]; then
+        echo "already-static"
+        exit 0
+      fi
+      if [ -n "$current" ]; then
+        docker network disconnect devastation "$node"
+      fi
+      docker network connect --ip "$wanted" devastation "$node"
+      echo "changed"
+      exit 0
+    fi
+
+    if [ -n "$current" ]; then
+      echo "already-connected"
+      exit 0
+    fi
+    docker network connect devastation "$node"
+    echo "changed"
   loop: "{{ kind_nodes.stdout_lines }}"
   register: kind_network_connect
-  changed_when: kind_network_connect.rc == 0
-  failed_when:
-    - kind_network_connect.rc != 0
-    - "'already exists' not in kind_network_connect.stderr"
+  changed_when: "'changed' in kind_network_connect.stdout"
 
 - name: Configure registry trust inside KIND nodes
   ansible.builtin.shell: |

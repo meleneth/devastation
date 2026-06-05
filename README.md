@@ -142,6 +142,7 @@ Non-browser endpoints:
 
 - OTLP gRPC: `otel-collector.deva.station:4317`
 - OTLP HTTP: `http://otel-collector.deva.station:4318`
+- KIND Kubernetes API: `https://kind.deva.station:6443`
 - GitLab SSH: `ssh://git@gitlab.deva.station:2222`
 - Postgres test DB: `postgres://devastation:devastation@test-db.deva.station:5432/test_db`
 - Postgres development DB: `postgres://devastation:devastation@development-db.deva.station:5432/development_db`

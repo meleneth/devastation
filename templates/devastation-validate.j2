@@ -59,6 +59,7 @@ check "OTel Collector metrics reachable" curl -fsS "http://otel-collector.${DOMA
 check "{{ pg.service }} reachable" nc -z "{{ pg.hostname }}" 5432 || status=1
 {% endfor %}
 check "KIND cluster listed" kind get clusters || status=1
+check "KIND API reachable at kind.${DOMAIN}" nc -z "kind.${DOMAIN}" {{ kind_api_port }} || status=1
 check "kubectl cluster-info" kubectl cluster-info || status=1
 check "Helm installed" helm version --short || status=1
 check "k9s installed" k9s version || status=1
