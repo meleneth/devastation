@@ -78,3 +78,171 @@
     docker exec "$node" systemctl restart containerd
   loop: "{{ kind_nodes.stdout_lines }}"
   changed_when: true
+
+- name: Add Helm repository for cert-manager
+  ansible.builtin.command:
+    argv:
+      - helm
+      - repo
+      - add
+      - jetstack
+      - "{{ cert_manager_helm_repo }}"
+      - --force-update
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
+- name: Add Helm repository for Istio
+  ansible.builtin.command:
+    argv:
+      - helm
+      - repo
+      - add
+      - istio
+      - "{{ istio_helm_repo }}"
+      - --force-update
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
+- name: Refresh Helm repositories
+  ansible.builtin.command:
+    argv:
+      - helm
+      - repo
+      - update
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
+- name: Install cert-manager for operator webhooks
+  ansible.builtin.command:
+    argv:
+      - helm
+      - upgrade
+      - --install
+      - cert-manager
+      - jetstack/cert-manager
+      - --namespace
+      - cert-manager
+      - --create-namespace
+      - --set
+      - crds.enabled=true
+      - --wait
+      - --timeout
+      - 5m
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
+- name: Install Istio base chart
+  ansible.builtin.command:
+    argv:
+      - helm
+      - upgrade
+      - --install
+      - istio-base
+      - istio/base
+      - --version
+      - "{{ istio_version }}"
+      - --namespace
+      - istio-system
+      - --create-namespace
+      - --wait
+      - --timeout
+      - 5m
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
+- name: Install Istio control plane
+  ansible.builtin.command:
+    argv:
+      - helm
+      - upgrade
+      - --install
+      - istiod
+      - istio/istiod
+      - --version
+      - "{{ istio_version }}"
+      - --namespace
+      - istio-system
+      - --wait
+      - --timeout
+      - 10m
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
+- name: Ensure Argo CD namespace exists
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - create
+      - namespace
+      - argocd
+  register: argocd_namespace
+  changed_when: argocd_namespace.rc == 0
+  failed_when:
+    - argocd_namespace.rc != 0
+    - "'AlreadyExists' not in argocd_namespace.stderr"
+  when: kind_install_platform_addons | bool
+
+- name: Install Argo CD
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - -n
+      - argocd
+      - --server-side
+      - --force-conflicts
+      - -f
+      - "{{ argocd_manifest_url }}"
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
+- name: Install OpenTelemetry Operator
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - --server-side
+      - --force-conflicts
+      - -f
+      - "{{ otel_operator_manifest_url }}"
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
+- name: Wait for Istio control plane
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - -n
+      - istio-system
+      - rollout
+      - status
+      - deployment/istiod
+      - --timeout=300s
+  changed_when: false
+  when: kind_install_platform_addons | bool
+
+- name: Wait for Argo CD API server
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - -n
+      - argocd
+      - rollout
+      - status
+      - deployment/argocd-server
+      - --timeout=300s
+  changed_when: false
+  when: kind_install_platform_addons | bool
+
+- name: Wait for OpenTelemetry Operator
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - -n
+      - opentelemetry-operator-system
+      - rollout
+      - status
+      - deployment/opentelemetry-operator-controller-manager
+      - --timeout=300s
+  changed_when: false
+  when: kind_install_platform_addons | bool

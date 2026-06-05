@@ -35,6 +35,7 @@
         - { path: "{{ devastation_paths.observability }}", mode: "0755" }
         - { path: "{{ devastation_paths.vault }}", mode: "0755" }
         - { path: "{{ devastation_paths.eventline }}", mode: "0755" }
+        - { path: "{{ devastation_paths.storage }}", mode: "0755" }
         - { path: "{{ devastation_paths.postgres }}", mode: "0755" }
         - { path: "{{ devastation_paths.logs }}", mode: "0755" }
 
@@ -59,6 +60,10 @@
 
     - name: Restart Docker before dependent services
       ansible.builtin.meta: flush_handlers
+
+    - name: Apply developer tools role
+      ansible.builtin.import_role:
+        name: dev_tools
 
     - name: Apply user language toolchains role
       ansible.builtin.import_role:
@@ -107,6 +112,10 @@
     - name: Apply eventline role
       ansible.builtin.import_role:
         name: eventline
+
+    - name: Apply storage role
+      ansible.builtin.import_role:
+        name: storage
 
     - name: Apply observability role
       ansible.builtin.import_role:

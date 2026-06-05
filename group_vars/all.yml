@@ -23,6 +23,7 @@ devastation_subnets:
   cadvisor: 172.30.42.24
   vault: 172.30.42.25
   eventline: 172.30.42.26
+  storage: 172.30.42.27
   test_db: 172.30.42.31
   development_db: 172.30.42.32
   production_db: 172.30.42.33
@@ -63,6 +64,8 @@ devastation_dns_records:
     ip: "{{ devastation_subnets.vault }}"
   - name: "eventline.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.eventline }}"
+  - name: "storage.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.storage }}"
   - name: "test-db.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.test_db }}"
   - name: "development-db.{{ devastation_domain }}"
@@ -90,6 +93,7 @@ devastation_internal_hostnames:
   - "cadvisor.{{ devastation_domain }}"
   - "vault.{{ devastation_domain }}"
   - "eventline.{{ devastation_domain }}"
+  - "storage.{{ devastation_domain }}"
   - "test-db.{{ devastation_domain }}"
   - "development-db.{{ devastation_domain }}"
   - "production-db.{{ devastation_domain }}"
@@ -109,6 +113,7 @@ devastation_paths:
   observability: "{{ devastation_root }}/observability"
   vault: "{{ devastation_root }}/vault"
   eventline: "{{ devastation_root }}/eventline"
+  storage: "{{ devastation_root }}/storage"
   postgres: "{{ devastation_root }}/postgres"
   logs: "{{ devastation_root }}/logs"
 
@@ -239,6 +244,18 @@ kind_version: v0.23.0
 kubectl_version: v1.30.2
 kind_node_image: kindest/node:v1.30.0
 kind_api_port: 6443
+helm_version: v4.2.0
+k9s_version: v0.50.18
+lazydocker_version: 0.25.0
+trivy_version: 0.70.0
+istio_version: 1.30.0
+argocd_version: v3.4.2
+otel_operator_version: v0.151.0
+kind_install_platform_addons: true
+cert_manager_helm_repo: https://charts.jetstack.io
+istio_helm_repo: https://istio-release.storage.googleapis.com/charts
+argocd_manifest_url: "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml"
+otel_operator_manifest_url: "https://github.com/open-telemetry/opentelemetry-operator/releases/download/{{ otel_operator_version }}/opentelemetry-operator.yaml"
 
 gitlab_version: "17.1.1-ce.0"
 gitlab_hostname: "gitlab.{{ devastation_domain }}"
@@ -291,6 +308,11 @@ vault_dev_root_token: devastation
 vault_port: 8200
 goaws_image: admiralpiett/goaws:v0.5.4
 goaws_port: 4100
+minio_image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+minio_root_user: devastation
+minio_root_password: devastation
+minio_api_port: 9000
+minio_console_port: 9001
 
 grafana_image: grafana/grafana-enterprise:latest
 grafana_admin_user: admin

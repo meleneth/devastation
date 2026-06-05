@@ -92,6 +92,7 @@ These names are served under `deva.station`:
 - `cadvisor.deva.station`
 - `vault.deva.station`
 - `eventline.deva.station`
+- `storage.deva.station`
 - `test-db.deva.station`
 - `development-db.deva.station`
 - `production-db.deva.station`
@@ -188,6 +189,7 @@ The compose project includes local dev data services and an observability stack:
 
 - Vault dev server: `http://vault.deva.station:8200`, root token `devastation`
 - Eventline GoAWS SNS/SQS emulator: `http://eventline.deva.station:4100`
+- MinIO object storage: `http://storage.deva.station:9000`, console `http://storage.deva.station:9001`, root credentials `devastation` / `devastation`
 - Postgres 18 containers: `test-db`, `development-db`, `production-db`, and `otel-db`
 - Grafana: `http://grafana.deva.station:3000`, admin password `devastation`
 - Prometheus: `http://prometheus.deva.station:9090`
@@ -196,6 +198,8 @@ The compose project includes local dev data services and an observability stack:
 - OTLP collector endpoint: `otel-collector.deva.station:4317` for gRPC and `:4318` for HTTP
 
 Grafana is provisioned with Prometheus, Loki, Jaeger, and all four Postgres databases as data sources. Starter dashboards are generated under `/srv/devastation/observability/grafana/dashboards`. Prometheus scrapes node-exporter, cAdvisor, the registry metrics endpoints, Grafana, Loki, Vault, OTel Collector, and Postgres exporters.
+
+The host toolchain includes Helm, K9s, Lazydocker, and Trivy. The KIND cluster is bootstrapped with Istio, Argo CD, cert-manager, and the OpenTelemetry Operator when `kind_install_platform_addons` is enabled. MinIO is pinned to a known community image tag because current MinIO community image publishing is in flux; use `minio_image` to swap in a preferred fork or enterprise image.
 
 GitLab CE runs at `https://gitlab.deva.station` and exposes SSH on host port `2222`. GitLab stores persistent data under `/srv/devastation/gitlab`.
 
@@ -269,7 +273,7 @@ Reset KIND only:
 Inspect logs:
 
 ```bash
-docker compose -f /srv/devastation/compose/compose.yml logs -f dns registry apt-cache gitlab gitlab-runner prometheus grafana loki jaeger otel-collector vault
+docker compose -f /srv/devastation/compose/compose.yml logs -f dns registry apt-cache gitlab gitlab-runner prometheus grafana loki jaeger otel-collector vault eventline storage
 ```
 
 Regenerate by convergence:

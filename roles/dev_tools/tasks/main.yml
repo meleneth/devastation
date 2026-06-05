@@ -1,0 +1,110 @@
+---
+- name: Check Helm binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/helm
+  register: helm_binary
+
+- name: Create Helm archive directory
+  ansible.builtin.file:
+    path: /tmp/devastation-helm
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: not helm_binary.stat.exists
+
+- name: Download Helm archive
+  ansible.builtin.get_url:
+    url: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    dest: "/tmp/devastation-helm/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    mode: "0644"
+  when: not helm_binary.stat.exists
+
+- name: Extract Helm archive
+  ansible.builtin.unarchive:
+    src: "/tmp/devastation-helm/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    dest: /tmp/devastation-helm
+    remote_src: true
+  when: not helm_binary.stat.exists
+
+- name: Install Helm binary
+  ansible.builtin.copy:
+    src: /tmp/devastation-helm/linux-amd64/helm
+    dest: /usr/local/bin/helm
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+  when: not helm_binary.stat.exists
+
+- name: Check K9s binary
+  ansible.builtin.stat:
+    path: /usr/bin/k9s
+  register: k9s_binary
+
+- name: Download K9s package
+  ansible.builtin.get_url:
+    url: "https://github.com/derailed/k9s/releases/download/{{ k9s_version }}/k9s_linux_amd64.deb"
+    dest: "/tmp/k9s_linux_amd64_{{ k9s_version }}.deb"
+    mode: "0644"
+  when: not k9s_binary.stat.exists
+
+- name: Install K9s package
+  ansible.builtin.apt:
+    deb: "/tmp/k9s_linux_amd64_{{ k9s_version }}.deb"
+  when: not k9s_binary.stat.exists
+
+- name: Check Lazydocker binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/lazydocker
+  register: lazydocker_binary
+
+- name: Create Lazydocker archive directory
+  ansible.builtin.file:
+    path: /tmp/devastation-lazydocker
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: not lazydocker_binary.stat.exists
+
+- name: Download Lazydocker archive
+  ansible.builtin.get_url:
+    url: "https://github.com/jesseduffield/lazydocker/releases/download/v{{ lazydocker_version }}/lazydocker_{{ lazydocker_version }}_Linux_x86_64.tar.gz"
+    dest: "/tmp/devastation-lazydocker/lazydocker_{{ lazydocker_version }}_Linux_x86_64.tar.gz"
+    mode: "0644"
+  when: not lazydocker_binary.stat.exists
+
+- name: Extract Lazydocker archive
+  ansible.builtin.unarchive:
+    src: "/tmp/devastation-lazydocker/lazydocker_{{ lazydocker_version }}_Linux_x86_64.tar.gz"
+    dest: /tmp/devastation-lazydocker
+    remote_src: true
+  when: not lazydocker_binary.stat.exists
+
+- name: Install Lazydocker binary
+  ansible.builtin.copy:
+    src: /tmp/devastation-lazydocker/lazydocker
+    dest: /usr/local/bin/lazydocker
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: true
+  when: not lazydocker_binary.stat.exists
+
+- name: Check Trivy binary
+  ansible.builtin.stat:
+    path: /usr/bin/trivy
+  register: trivy_binary
+
+- name: Download Trivy package
+  ansible.builtin.get_url:
+    url: "https://github.com/aquasecurity/trivy/releases/download/v{{ trivy_version }}/trivy_{{ trivy_version }}_Linux-64bit.deb"
+    dest: "/tmp/trivy_{{ trivy_version }}_Linux-64bit.deb"
+    mode: "0644"
+  when: not trivy_binary.stat.exists
+
+- name: Install Trivy package
+  ansible.builtin.apt:
+    deb: "/tmp/trivy_{{ trivy_version }}_Linux-64bit.deb"
+  when: not trivy_binary.stat.exists

@@ -34,6 +34,7 @@ check "registry metrics reachable" curl -fsS "http://${REGISTRY}:{{ registry_met
 check "apt cache reachable" curl -fsS "http://apt-cache.${DOMAIN}:{{ apt_cache_port }}/acng-report.html" || status=1
 check "Vault reachable" curl -fsS "http://vault.${DOMAIN}:{{ vault_port }}/v1/sys/health" || status=1
 check "eventline GoAWS reachable" nc -z "eventline.${DOMAIN}" {{ goaws_port }} || status=1
+check "storage MinIO reachable" curl -fsS "http://storage.${DOMAIN}:{{ minio_api_port }}/minio/health/live" || status=1
 check "Prometheus reachable" curl -fsS "http://prometheus.${DOMAIN}:{{ prometheus_port }}/-/ready" || status=1
 check "Grafana reachable" curl -fsS "http://grafana.${DOMAIN}:{{ grafana_port }}/api/health" || status=1
 check "Jaeger reachable" curl -fsS "http://jaeger.${DOMAIN}:{{ jaeger_ui_port }}/" || status=1
@@ -44,6 +45,15 @@ check "{{ pg.service }} reachable" nc -z "{{ pg.hostname }}" 5432 || status=1
 {% endfor %}
 check "KIND cluster listed" kind get clusters || status=1
 check "kubectl cluster-info" kubectl cluster-info || status=1
+check "Helm installed" helm version --short || status=1
+check "k9s installed" k9s version || status=1
+check "lazydocker installed" lazydocker --version || status=1
+check "trivy installed" trivy --version || status=1
+{% if kind_install_platform_addons %}
+check "Istio installed" kubectl -n istio-system get deployment istiod || status=1
+check "Argo CD installed" kubectl -n argocd get deployment argocd-server || status=1
+check "OTel operator installed" kubectl -n opentelemetry-operator-system get deployment opentelemetry-operator-controller-manager || status=1
+{% endif %}
 check "GitLab web reachable" curl -kfsS "{{ gitlab_external_url }}/-/health" || status=1
 check "runner container running" docker compose -f "{{ devastation_paths.compose }}/compose.yml" ps --status running gitlab-runner || status=1
 check "neovim installed" nvim --version || status=1
