@@ -42,7 +42,7 @@ fi
 
 ansible-playbook playbooks/bootstrap.yml "${args[@]}"
 
-home_url="${DEVASTATION_HOME_URL:-http://www.deva.station}"
+home_url="${DEVASTATION_HOME_URL:-https://deva.station}"
 open_home="${DEVASTATION_OPEN_HOME:-1}"
 
 if [[ "$open_home" == "1" ]]; then

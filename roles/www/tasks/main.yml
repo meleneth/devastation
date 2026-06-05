@@ -9,11 +9,20 @@
   loop:
     - "{{ devastation_paths.www }}"
     - "{{ devastation_paths.www }}/html"
+    - "{{ devastation_paths.www }}/nginx"
 
 - name: Write web portal homepage
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../templates/www-index.html.j2"
     dest: "{{ devastation_paths.www }}/html/index.html"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write web portal nginx config
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/www-nginx.conf.j2"
+    dest: "{{ devastation_paths.www }}/nginx/default.conf"
     owner: root
     group: root
     mode: "0644"

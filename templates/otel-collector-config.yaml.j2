@@ -10,6 +10,14 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
+  resource/www:
+    attributes:
+      - key: service.name
+        value: www
+        action: upsert
+      - key: service.namespace
+        value: devastation
+        action: upsert
   batch: {}
 
 exporters:
@@ -46,6 +54,10 @@ service:
       processors: [batch]
       exporters: [prometheus, debug]
     logs:
-      receivers: [otlp, fluent_forward/www]
+      receivers: [otlp]
       processors: [batch]
+      exporters: [otlphttp/loki, debug]
+    logs/www:
+      receivers: [fluent_forward/www]
+      processors: [resource/www, batch]
       exporters: [otlphttp/loki, debug]

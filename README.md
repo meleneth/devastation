@@ -22,14 +22,14 @@ Persistent state defaults to `/srv/devastation`:
 - `/srv/devastation/vault`: Vault dev-mode data
 - `/srv/devastation/eventline`: Eventline GoAWS configuration/data
 - `/srv/devastation/storage`: MinIO object data
-- `/srv/devastation/www`: static `www.deva.station` portal files
+- `/srv/devastation/www`: static `deva.station` / `www.deva.station` portal files and nginx config
 - `/srv/devastation/postgres`: Postgres database data
 
 Core services run on the Docker network `devastation` with static addresses in `172.30.42.0/24`. CoreDNS serves `deva.station` and forwards everything else to configurable upstream resolvers.
 
 The current feature set includes:
 
-- Private `deva.station` DNS and `/etc/hosts` records for every core service, plus a `www.deva.station` portal
+- Private `deva.station` DNS and `/etc/hosts` records for every core service, plus an HTTPS portal at `deva.station` and `www.deva.station`
 - Ephemeral local root CA issuance with host, browser NSS, Docker, KIND, and GitLab Runner trust installation
 - Local HTTPS Docker registry plus Docker Hub pull-through cache
 - Host apt proxying through apt-cacher-ng
@@ -54,7 +54,7 @@ Bring the environment up:
 ./bin/devastation-up
 ```
 
-On success, `devastation-up` opens [Devastation Home](http://www.deva.station). Set `DEVASTATION_OPEN_HOME=0` to only print the URL.
+On success, `devastation-up` opens [Devastation Home](https://deva.station). Set `DEVASTATION_OPEN_HOME=0` to only print the URL.
 
 By default, `devastation-up` passes `--ask-become-pass` to Ansible. Set `DEVASTATION_ASSUME_WARM_SUDO=1` to skip that prompt when sudo is already warm, or `DEVASTATION_DEBUG_UP=1` to print the exact Ansible command line.
 
@@ -97,6 +97,7 @@ Refresh the official Neovim tarball intentionally:
 
 These names are served under `deva.station`:
 
+- `deva.station`
 - `dns.deva.station`
 - `ca.deva.station`
 - `registry.deva.station`
@@ -126,7 +127,8 @@ These names are served under `deva.station`:
 Browser-friendly local links:
 
 - [GitLab](https://gitlab.deva.station)
-- [Devastation Home](http://www.deva.station)
+- [Devastation Home](https://deva.station)
+- [Devastation Home www](https://www.deva.station)
 - [Grafana](http://grafana.deva.station:3000)
 - [Prometheus](http://prometheus.deva.station:9090)
 - [Jaeger](http://jaeger.deva.station:16686)
@@ -255,7 +257,7 @@ The compose project includes local dev data services and an observability stack:
 - Loki: `http://loki.deva.station:3100`
 - OTLP collector endpoint: `otel-collector.deva.station:4317` for gRPC and `:4318` for HTTP
 
-Grafana is provisioned with Prometheus, Loki, Jaeger, and all four Postgres databases as data sources. Dashboards are generated under `/srv/devastation/observability/grafana/dashboards`, including a system overview, database dashboard, and the widely used Grafana.com `Node Exporter Full` host monitoring dashboard, ID `1860`. Prometheus scrapes Prometheus itself, node-exporter, cAdvisor, both registry metrics endpoints, Grafana, Loki, Vault, OTel Collector internal metrics, OTel Collector pipeline metrics, and Postgres exporters for every database container.
+Grafana is provisioned with Prometheus, Loki, Jaeger, and all four Postgres databases as data sources. Dashboards are generated under `/srv/devastation/observability/grafana/dashboards`, including a system overview, database dashboard, WWW portal dashboard, and the widely used Grafana.com `Node Exporter Full` host monitoring dashboard, ID `1860`. Prometheus scrapes Prometheus itself, node-exporter, cAdvisor, both registry metrics endpoints, Grafana, Loki, Vault, OTel Collector internal metrics, OTel Collector pipeline metrics, and Postgres exporters for every database container.
 
 The OTel Collector receives OTLP over gRPC and HTTP, receives `www` nginx container logs over Docker's fluentd logging driver, then exports traces to Jaeger and logs to Loki. The `otel-db` Postgres container is included as a Grafana datasource so experiments that need an observability-owned database have a reserved target from day one.
 

@@ -1,0 +1,38 @@
+server {
+    listen {{ www_http_port }};
+    server_name {{ devastation_domain }} www.{{ devastation_domain }};
+
+    return 308 https://$host$request_uri;
+}
+
+server {
+    listen {{ www_https_port }} ssl;
+    http2 on;
+    server_name {{ devastation_domain }};
+
+    ssl_certificate /etc/nginx/certs/{{ devastation_domain }}/tls.crt;
+    ssl_certificate_key /etc/nginx/certs/{{ devastation_domain }}/tls.key;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+server {
+    listen {{ www_https_port }} ssl;
+    http2 on;
+    server_name www.{{ devastation_domain }};
+
+    ssl_certificate /etc/nginx/certs/www.{{ devastation_domain }}/tls.crt;
+    ssl_certificate_key /etc/nginx/certs/www.{{ devastation_domain }}/tls.key;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

@@ -81,7 +81,9 @@ check "apt cache reachable" curl -fsS "http://apt-cache.${DOMAIN}:{{ apt_cache_p
 check "Vault reachable" curl -fsS "http://vault.${DOMAIN}:{{ vault_port }}/v1/sys/health" || status=1
 check "eventline GoAWS reachable" nc -z "eventline.${DOMAIN}" {{ goaws_port }} || status=1
 check "storage MinIO reachable" curl -fsS "http://storage.${DOMAIN}:{{ minio_api_port }}/minio/health/live" || status=1
-check "www portal reachable" curl -fsS "http://www.${DOMAIN}:{{ www_port }}/" || status=1
+check "apex portal reachable" curl -fsS "https://${DOMAIN}/" || status=1
+check "www portal reachable" curl -fsS "https://www.${DOMAIN}/" || status=1
+check "www portal redirects HTTP to HTTPS" bash -c "curl -fsSI 'http://www.${DOMAIN}:{{ www_http_port }}/' | grep -qi '^location: https://www\\.${DOMAIN}/'" || status=1
 check "Prometheus reachable" curl -fsS "http://prometheus.${DOMAIN}:{{ prometheus_port }}/-/ready" || status=1
 check "Grafana reachable" curl -fsS "http://grafana.${DOMAIN}:{{ grafana_port }}/api/health" || status=1
 check "Jaeger reachable" curl -fsS "http://jaeger.${DOMAIN}:{{ jaeger_ui_port }}/" || status=1

@@ -73,6 +73,14 @@
     group: root
     mode: "0644"
 
+- name: Write Grafana www dashboard
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/grafana-dashboard-devastation-www.json.j2"
+    dest: "{{ devastation_paths.observability }}/grafana/dashboards/devastation-www.json"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Install Grafana Node Exporter Full dashboard
   ansible.builtin.copy:
     src: "{{ playbook_dir }}/../files/grafana-dashboard-node-exporter-full.json"

@@ -122,6 +122,9 @@ services:
         tag: "devastation.www"
     volumes:
       - {{ devastation_paths.www }}/html:/usr/share/nginx/html:ro
+      - {{ devastation_paths.www }}/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - {{ devastation_paths.certs }}/{{ devastation_domain }}:/etc/nginx/certs/{{ devastation_domain }}:ro
+      - {{ devastation_paths.certs }}/www.{{ devastation_domain }}:/etc/nginx/certs/www.{{ devastation_domain }}:ro
     networks:
       devastation:
         ipv4_address: {{ devastation_subnets.www }}
