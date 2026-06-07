@@ -40,6 +40,19 @@
     state: present
     lock_timeout: "{{ apt_lock_timeout | int }}"
 
+- name: Gather host service facts for SSH policy
+  ansible.builtin.service_facts:
+
+- name: Disable host SSH daemon when GitLab owns SSH
+  ansible.builtin.service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop: "{{ host_sshd_service_names }}"
+  when:
+    - not host_sshd_enabled | bool
+    - item in ansible_facts.services
+
 - name: Ensure pipx path is available for target user
   ansible.builtin.command: pipx ensurepath
   become: true

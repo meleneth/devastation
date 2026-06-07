@@ -16,3 +16,8 @@
 - name: Show validation summary
   ansible.builtin.debug:
     var: validation_result.stdout_lines
+
+- name: Fail when lightweight validation reports errors
+  ansible.builtin.fail:
+    msg: "{{ validation_result.stderr_lines + validation_result.stdout_lines }}"
+  when: validation_result.rc != 0

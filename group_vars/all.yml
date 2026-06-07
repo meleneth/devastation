@@ -145,6 +145,10 @@ devastation_paths:
 
 base_packages_extra: []
 apt_lock_timeout: 300
+host_sshd_enabled: false
+host_sshd_service_names:
+  - ssh.service
+  - sshd.service
 base_packages_default:
   - apt-transport-https
   - bash
@@ -334,7 +338,7 @@ otel_operator_manifest_url: "https://github.com/open-telemetry/opentelemetry-ope
 gitlab_version: "17.1.1-ce.0"
 gitlab_hostname: "gitlab.{{ devastation_domain }}"
 gitlab_external_url: "https://{{ gitlab_hostname }}"
-gitlab_ssh_port: 2222
+gitlab_ssh_port: 22
 gitlab_http_port: 8080
 gitlab_https_port: 8443
 gitlab_allow_existing_data: false

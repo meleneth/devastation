@@ -165,7 +165,7 @@ Non-browser endpoints:
 - OTLP gRPC: `otel-collector.deva.station:4317`
 - OTLP HTTP: `http://otel-collector.deva.station:4318`
 - KIND Kubernetes API: `https://kind.deva.station:6443`
-- GitLab SSH: `ssh://git@gitlab.deva.station:2222`
+- GitLab SSH: `git@gitlab.deva.station`
 - npm registry: `http://npm-cache.deva.station:4873`
 - pip index: `http://pypi-cache.deva.station:3141/root/pypi/+simple/`
 - RubyGems source: `http://gem-cache.deva.station:9292`
@@ -337,7 +337,9 @@ Default versions are pinned in `group_vars/all.yml`: KIND `v0.23.0`, kubectl `v1
 
 ## GitLab
 
-GitLab CE runs at `https://gitlab.deva.station` and exposes SSH on host port `2222`. GitLab stores persistent data under `/srv/devastation/gitlab`.
+GitLab CE runs at `https://gitlab.deva.station` and exposes SSH directly at `gitlab.deva.station:22`. GitLab stores persistent data under `/srv/devastation/gitlab`.
+
+Bootstrap disables the host SSH daemon by default (`host_sshd_enabled: false`) so port 22 behavior belongs to the named GitLab service instead of the workstation. Set `host_sshd_enabled: true` before bootstrap if this host must keep accepting direct SSH logins.
 
 The playbook stops before touching existing GitLab data unless one of these is true:
 

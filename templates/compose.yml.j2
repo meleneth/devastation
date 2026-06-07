@@ -342,7 +342,6 @@ services:
     ports:
       - "{{ gitlab_http_port }}:80"
       - "{{ gitlab_https_port }}:443"
-      - "{{ gitlab_ssh_port }}:22"
     volumes:
       - {{ devastation_paths.gitlab }}/config:/etc/gitlab
       - {{ devastation_paths.gitlab }}/logs:/var/log/gitlab

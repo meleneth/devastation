@@ -75,6 +75,9 @@ check "host CA trust" test -f /usr/local/share/ca-certificates/devastation-root-
 check "ephemeral CA private key absent" run_root test ! -e "{{ devastation_paths.ca }}/root-ca.key" || status=1
 check "certificate universe verifies" run_root "{{ ca_rotation_script }}" --verify-only || status=1
 check "Docker running" docker info || status=1
+{% if not host_sshd_enabled %}
+check "host SSH daemon disabled" bash -c "! systemctl is-active --quiet ssh.service && ! systemctl is-active --quiet sshd.service" || status=1
+{% endif %}
 check "registry reachable" curl -fsS "https://${REGISTRY}/v2/" || status=1
 check "registry metrics reachable" curl -fsS "http://${REGISTRY}:{{ registry_metrics_port }}/metrics" || status=1
 check "apt cache reachable" curl -fsS "http://apt-cache.${DOMAIN}:{{ apt_cache_port }}/acng-report.html" || status=1
@@ -113,6 +116,7 @@ check "Argo CD installed" kubectl -n argocd get deployment argocd-server || stat
 check "OTel operator installed" kubectl -n opentelemetry-operator-system get deployment opentelemetry-operator-controller-manager || status=1
 {% endif %}
 retry_check "GitLab web reachable" 24 5 curl -kfsS "{{ gitlab_external_url }}/users/sign_in" || status=1
+check "GitLab SSH reachable" nc -z "{{ gitlab_hostname }}" {{ gitlab_ssh_port }} || status=1
 check "runner container running" docker compose -f "{{ devastation_paths.compose }}/compose.yml" ps --status running gitlab-runner || status=1
 check "neovim installed" nvim --version || status=1
 
