@@ -253,7 +253,7 @@ Share [AGENTS.md](AGENTS.md) with coding agents so they use the local caches ins
 
 ## Project Docs
 
-User-facing runbooks live under `docs/` and are built with VitePress. They cover GitLab first-run tasks, runner registration, Vault usage, TeamCity, and the SNS/SQS/S3-style local services.
+User-facing runbooks live under `docs/` and are built with VitePress. They cover GitLab first-run tasks, runner registration, Vault usage, TeamCity, and the SNS/SQS/S3-style local services. Bootstrap publishes the built docs into the local portal at `https://deva.station/docs/` and `https://www.deva.station/docs/`.
 
 Run the docs locally:
 

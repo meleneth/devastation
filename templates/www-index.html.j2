@@ -64,6 +64,11 @@
             <p class="mt-4 max-w-3xl text-sm leading-6 text-lospec-mint sm:text-base">
               Local-first services, tools, telemetry, and databases. One page, many doors.
             </p>
+            <div class="mt-5 flex flex-wrap gap-3 text-xs uppercase">
+              <a href="https://deva.station/docs/" class="border-2 border-lospec-lime bg-lospec-pine px-4 py-2 text-lospec-lime shadow-pixel transition hover:-translate-y-1 hover:bg-lospec-ink focus:outline-none focus:ring-4 focus:ring-lospec-lime">Docs</a>
+              <a href="https://gitlab.deva.station" class="border-2 border-lospec-cyan bg-lospec-indigo px-4 py-2 text-lospec-cyan transition hover:-translate-y-1 hover:bg-lospec-ink focus:outline-none focus:ring-4 focus:ring-lospec-cyan">GitLab</a>
+              <a href="http://grafana.deva.station:3000" class="border-2 border-lospec-gold bg-lospec-bark px-4 py-2 text-lospec-gold transition hover:-translate-y-1 hover:bg-lospec-ink focus:outline-none focus:ring-4 focus:ring-lospec-gold">Grafana</a>
+            </div>
           </div>
 
           <div class="grid grid-cols-3 gap-2 text-center text-xs uppercase">
@@ -158,6 +163,7 @@
             browserLinks: [
               { name: "Devastation Home", href: "https://deva.station", kind: "home", description: "HTTPS portal on the apex deva.station hostname." },
               { name: "Devastation Home www", href: "https://www.deva.station", kind: "home", description: "HTTPS portal on the www.deva.station hostname." },
+              { name: "Devastation Docs", href: "https://deva.station/docs/", kind: "docs", description: "User-facing runbooks for GitLab, Vault, TeamCity, and local services." },
               { name: "GitLab", href: "https://gitlab.deva.station", kind: "code", description: "Local GitLab CE, projects, issues, and CI." },
               { name: "Grafana", href: "http://grafana.deva.station:3000", kind: "obs", description: "Dashboards, logs, traces, metrics, and Postgres datasources." },
               { name: "Prometheus", href: "http://prometheus.deva.station:9090", kind: "obs", description: "Metrics scrape targets and PromQL." },

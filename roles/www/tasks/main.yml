@@ -19,6 +19,47 @@
     group: root
     mode: "0644"
 
+- name: Install docs dependencies
+  ansible.builtin.command:
+    argv:
+      - npm
+      - ci
+  args:
+    chdir: "{{ playbook_dir }}/.."
+    creates: "{{ playbook_dir }}/../node_modules/vitepress"
+  environment:
+    NPM_CONFIG_REGISTRY: "{{ user_setup_npm_registry }}"
+
+- name: Build local docs site
+  ansible.builtin.command:
+    argv:
+      - npm
+      - run
+      - docs:build
+  args:
+    chdir: "{{ playbook_dir }}/.."
+  environment:
+    VITEPRESS_BASE: /docs/
+    VITEPRESS_OUT_DIR: "{{ docs_build_output }}"
+    NPM_CONFIG_REGISTRY: "{{ user_setup_npm_registry }}"
+  changed_when: true
+
+- name: Create docs target directory
+  ansible.builtin.file:
+    path: "{{ devastation_paths.www }}/html/docs"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Publish docs into web portal
+  ansible.builtin.copy:
+    src: "{{ docs_build_output }}/"
+    dest: "{{ devastation_paths.www }}/html/docs/"
+    owner: root
+    group: root
+    mode: preserve
+
 - name: Write web portal nginx config
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../templates/www-nginx.conf.j2"

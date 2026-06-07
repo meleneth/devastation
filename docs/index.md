@@ -12,6 +12,8 @@ The local portal is available at:
 
 - `https://deva.station`
 - `https://www.deva.station`
+- `https://deva.station/docs/`
+- `https://www.deva.station/docs/`
 
 Useful defaults:
 

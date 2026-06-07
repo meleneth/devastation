@@ -86,7 +86,7 @@
       - --kubeconfig
       - "{{ kind_user_kubeconfig }}"
   register: kind_user_kubeconfig_export
-  changed_when: kind_user_kubeconfig_context.stdout | default('') != 'kind-{{ kind_cluster_name }}'
+  changed_when: kind_user_kubeconfig_context.stdout | default('') != 'kind-' ~ kind_cluster_name
   when: kind_configure_user_kubeconfig | bool
 
 - name: Ensure target user owns kubeconfig

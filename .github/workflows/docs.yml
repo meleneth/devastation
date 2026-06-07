@@ -37,6 +37,9 @@ jobs:
 
       - name: Build docs
         run: npm run docs:build
+        env:
+          VITEPRESS_BASE: /
+          VITEPRESS_OUT_DIR: .vitepress/dist
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

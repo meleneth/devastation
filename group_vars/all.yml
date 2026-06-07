@@ -385,6 +385,8 @@ vault_cli_archive: /tmp/devastation-vault_{{ vault_version }}_linux_amd64.zip
 vault_cli_release_url: https://releases.hashicorp.com/vault/{{ vault_version }}/vault_{{ vault_version }}_linux_amd64.zip
 teamcity_image: jetbrains/teamcity-server:latest
 teamcity_port: 8111
+teamcity_container_uid: "1000"
+teamcity_container_gid: "1000"
 goaws_image: admiralpiett/goaws:v0.5.4
 goaws_port: 4100
 minio_image: minio/minio:RELEASE.2025-04-22T22-12-26Z
@@ -395,6 +397,7 @@ minio_console_port: 9001
 www_image: nginx:1.27-alpine
 www_http_port: 80
 www_https_port: 443
+docs_build_output: /tmp/devastation-vitepress-dist
 
 grafana_image: grafana/grafana-enterprise:latest
 grafana_admin_user: admin

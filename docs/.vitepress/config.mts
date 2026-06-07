@@ -3,6 +3,8 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'Devastation',
   description: 'Local-first developer environment runbook',
+  base: process.env.VITEPRESS_BASE ?? '/docs/',
+  outDir: process.env.VITEPRESS_OUT_DIR ?? '/tmp/devastation-vitepress-dist',
   cleanUrls: true,
   themeConfig: {
     nav: [

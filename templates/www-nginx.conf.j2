@@ -16,6 +16,10 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    location /docs/ {
+        try_files $uri $uri/ /docs/index.html;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
     }
@@ -31,6 +35,10 @@ server {
 
     root /usr/share/nginx/html;
     index index.html;
+
+    location /docs/ {
+        try_files $uri $uri/ /docs/index.html;
+    }
 
     location / {
         try_files $uri $uri/ /index.html;
