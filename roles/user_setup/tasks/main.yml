@@ -163,6 +163,70 @@
       export GEM_SOURCE="{{ user_setup_gem_source }}"
   when: user_setup_configure_package_mirrors
 
+- name: Add Docker registry helpers to profile
+  ansible.builtin.blockinfile:
+    path: "{{ user_setup_shell_profile }}"
+    create: true
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+    marker: "# {mark} DEVASTATION DOCKER REGISTRY"
+    block: |
+      export DEVASTATION_DOCKER_REGISTRY="registry.{{ devastation_domain }}"
+
+      devastation_docker_registry_image() {
+        if [ "$#" -lt 1 ]; then
+          printf 'usage: devastation_docker_registry_image IMAGE[:TAG]\n' >&2
+          return 2
+        fi
+
+        case "$1" in
+          "$DEVASTATION_DOCKER_REGISTRY"/*)
+            printf '%s\n' "$1"
+            ;;
+          */*)
+            local first="${1%%/*}"
+            case "$first" in
+              *.*|*:*|localhost)
+                printf '%s/%s\n' "$DEVASTATION_DOCKER_REGISTRY" "${1#*/}"
+                ;;
+              *)
+                printf '%s/%s\n' "$DEVASTATION_DOCKER_REGISTRY" "$1"
+                ;;
+            esac
+            ;;
+          *)
+            printf '%s/%s\n' "$DEVASTATION_DOCKER_REGISTRY" "$1"
+            ;;
+        esac
+      }
+
+      dtag() {
+        if [ "$#" -lt 1 ]; then
+          printf 'usage: dtag IMAGE[:TAG] [REGISTRY_IMAGE[:TAG]]\n' >&2
+          return 2
+        fi
+
+        local source="$1"
+        local target="${2:-$(devastation_docker_registry_image "$source")}"
+        docker tag "$source" "$target"
+        printf '%s\n' "$target"
+      }
+
+      dpush() {
+        if [ "$#" -lt 1 ]; then
+          printf 'usage: dpush IMAGE[:TAG] [REGISTRY_IMAGE[:TAG]]\n' >&2
+          return 2
+        fi
+
+        local source="$1"
+        local target="${2:-$(devastation_docker_registry_image "$source")}"
+        if [ "$source" != "$target" ]; then
+          docker tag "$source" "$target"
+        fi
+        docker push "$target"
+      }
+
 - name: Resolve latest stable CPython version
   ansible.builtin.shell: |
     set -euo pipefail

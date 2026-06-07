@@ -2,7 +2,9 @@
   "dns": ["{{ docker_daemon_dns }}"],
   "features": {
     "buildkit": true
-  }{% if docker_insecure_registry_fallback %},
-  "insecure-registries": ["registry.{{ devastation_domain }}:443", "registry.{{ devastation_domain }}:5000"]
-  {% endif %}
+  }{% if docker_registry_mirrors | default([]) | length > 0 %},
+  "registry-mirrors": {{ docker_registry_mirrors | to_json }}
+{% endif %}{% set effective_insecure_registries = docker_insecure_registries | default([]) + (["registry." ~ devastation_domain ~ ":443", "registry." ~ devastation_domain ~ ":5000"] if docker_insecure_registry_fallback else []) %}{% if effective_insecure_registries | length > 0 %},
+  "insecure-registries": {{ effective_insecure_registries | to_json }}
+{% endif %}
 }

@@ -173,7 +173,15 @@ Non-browser endpoints:
 
 ## Registry
 
-The canonical local Kubernetes registry is `registry.deva.station` over HTTPS with the local root CA. The pull-through Docker Hub cache is `registry-cache.deva.station`. Host Docker trusts the CA through `/etc/docker/certs.d/registry.deva.station/ca.crt`; KIND nodes receive `/etc/containerd/certs.d/registry.deva.station/hosts.toml` and the CA certificate.
+The canonical local Kubernetes registry is `registry.deva.station` over HTTPS with the local root CA. Push private images there by tagging them with the registry hostname, for example `registry.deva.station/my-app:dev`. The pull-through Docker Hub cache is `registry-cache.deva.station`; Docker daemon registry mirrors use it for Docker Hub pulls, but Docker does not support rewriting unqualified pushes to a private registry. Host Docker trusts the CA through `/etc/docker/certs.d/registry.deva.station/ca.crt`; KIND nodes receive `/etc/containerd/certs.d/registry.deva.station/hosts.toml` and the CA certificate.
+
+The `user_setup` role adds shell helpers for local pushes:
+
+```bash
+dpush my-app:dev
+```
+
+That tags `my-app:dev` as `registry.deva.station/my-app:dev` and pushes it. Use `dtag my-app:dev` to only print/create the registry-qualified tag.
 
 Acceptance flow:
 

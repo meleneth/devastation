@@ -202,6 +202,10 @@ install_docker_engine: true
 docker_users:
   - "{{ devastation_user }}"
 docker_daemon_dns: "{{ devastation_subnets.dns }}"
+docker_registry_mirrors:
+  - "http://registry-cache.{{ devastation_domain }}:5000"
+docker_insecure_registries:
+  - "registry-cache.{{ devastation_domain }}:5000"
 docker_insecure_registry_fallback: false
 
 neovim_create_config_if_missing: true
