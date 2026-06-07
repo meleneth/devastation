@@ -23,10 +23,16 @@ ALL_HOSTNAMES=(
 {% for hostname in devastation_internal_hostnames %}
   "{{ hostname }}"
 {% endfor %}
+{% for hostname in devastation_extra_internal_hostnames %}
+  "{{ hostname }}"
+{% endfor %}
 )
 
 LEAF_CERTS=(
 {% for cert_name in ca_leaf_certificates %}
+  "{{ cert_name }}"
+{% endfor %}
+{% for cert_name in ca_extra_leaf_certificates %}
   "{{ cert_name }}"
 {% endfor %}
 )

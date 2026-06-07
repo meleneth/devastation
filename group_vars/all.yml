@@ -122,6 +122,12 @@ devastation_internal_hostnames:
   - "production-db.{{ devastation_domain }}"
   - "otel-db.{{ devastation_domain }}"
 
+devastation_extra_dns_records: []
+devastation_extra_internal_hostnames: []
+devastation_portal_include_extra_dns_sites: true
+devastation_portal_extra_browser_links: []
+devastation_portal_extra_endpoint_links: []
+
 devastation_paths:
   certs: "{{ devastation_root }}/certs"
   ca: "{{ devastation_root }}/ca"
@@ -256,6 +262,7 @@ ca_leaf_certificates:
   - "ca.{{ devastation_domain }}"
   - "apt-cache.{{ devastation_domain }}"
   - "kind.{{ devastation_domain }}"
+ca_extra_leaf_certificates: []
 cert_subject_country: US
 cert_valid_days: 825
 

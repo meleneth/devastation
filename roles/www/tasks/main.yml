@@ -11,6 +11,20 @@
     - "{{ devastation_paths.www }}/html"
     - "{{ devastation_paths.www }}/nginx"
 
+- name: Build web portal links for local cluster DNS records
+  ansible.builtin.set_fact:
+    www_cluster_site_links: "{{ (www_cluster_site_links | default([])) + [www_cluster_site_link] }}"
+  vars:
+    www_cluster_site_host: "{{ item.name }}"
+    www_cluster_site_label: "{{ item.name | regex_replace('\\.' ~ devastation_domain ~ '$', '') | regex_replace('[.-]+', ' ') | title }}"
+    www_cluster_site_link:
+      name: "{{ www_cluster_site_label }}"
+      href: "https://{{ www_cluster_site_host }}"
+      kind: cluster
+      description: "Cluster-deployed site discovered from local build variables."
+  loop: "{{ devastation_extra_dns_records | default([]) }}"
+  when: devastation_portal_include_extra_dns_sites | bool
+
 - name: Write web portal homepage
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../templates/www-index.html.j2"

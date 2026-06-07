@@ -147,6 +147,8 @@
 
     <script>
       const { createApp } = Vue;
+      const clusterBrowserLinks = {{ ((www_cluster_site_links | default([])) + (devastation_portal_extra_browser_links | default([]))) | to_json }};
+      const extraEndpointLinks = {{ (devastation_portal_extra_endpoint_links | default([])) | to_json }};
 
       createApp({
         data() {
@@ -186,7 +188,7 @@
               { name: "OTel Prom Exporter", href: "http://otel-collector.deva.station:9464/metrics", kind: "otel", description: "Collector Prometheus exporter endpoint." },
               { name: "node-exporter", href: "http://node-exporter.deva.station:9100/metrics", kind: "host", description: "Host metrics exposed for Prometheus." },
               { name: "cAdvisor", href: "http://cadvisor.deva.station:8080", kind: "host", description: "Container and host resource visibility." }
-            ],
+            ].concat(clusterBrowserLinks),
             endpointLinks: [
               { name: "OTLP gRPC", value: "otel-collector.deva.station:4317", kind: "otel", description: "Trace, metric, and log intake over gRPC." },
               { name: "OTLP HTTP", value: "http://otel-collector.deva.station:4318", kind: "otel", description: "Trace, metric, and log intake over HTTP." },
@@ -199,7 +201,7 @@
               { name: "development-db", value: "postgres://devastation:devastation@development-db.deva.station:5432/development_db", kind: "db", description: "Postgres development database." },
               { name: "production-db", value: "postgres://devastation:devastation@production-db.deva.station:5432/production_db", kind: "db", description: "Postgres production database." },
               { name: "otel-db", value: "postgres://devastation:devastation@otel-db.deva.station:5432/otel_db", kind: "db", description: "Reserved Postgres database for observability experiments." }
-            ]
+            ].concat(extraEndpointLinks)
           };
         },
         computed: {

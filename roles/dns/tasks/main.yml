@@ -38,6 +38,9 @@
       {% for record in devastation_dns_records %}
       {{ record.ip }} {{ record.name }}
       {% endfor %}
+      {% for record in devastation_extra_dns_records %}
+      {{ record.ip }} {{ record.name }}
+      {% endfor %}
   when: dns_configure_hosts_file
 
 - name: Gather service facts for resolver configuration

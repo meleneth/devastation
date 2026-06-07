@@ -7,6 +7,16 @@
     - ../group_vars/all.yml
 
   pre_tasks:
+    - name: Check for ignored local cluster extension variables
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../cluster/devastation-local-vars.yml"
+      register: cluster_local_vars
+
+    - name: Load ignored local cluster extension variables
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../cluster/devastation-local-vars.yml"
+      when: cluster_local_vars.stat.exists
+
     - name: Assert Debian family host
       ansible.builtin.assert:
         that:

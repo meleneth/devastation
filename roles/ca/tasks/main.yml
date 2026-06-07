@@ -42,13 +42,13 @@
 - name: Check leaf certificates
   ansible.builtin.stat:
     path: "{{ devastation_paths.certs }}/{{ item }}/tls.crt"
-  loop: "{{ ca_leaf_certificates }}"
+  loop: "{{ ca_leaf_certificates + ca_extra_leaf_certificates }}"
   register: ca_leaf_cert_stats
 
 - name: Check leaf private keys
   ansible.builtin.stat:
     path: "{{ devastation_paths.certs }}/{{ item }}/tls.key"
-  loop: "{{ ca_leaf_certificates }}"
+  loop: "{{ ca_leaf_certificates + ca_extra_leaf_certificates }}"
   register: ca_leaf_key_stats
 
 - name: Decide whether trust universe rotation is required

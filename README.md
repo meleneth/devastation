@@ -74,6 +74,8 @@ ansible-playbook --syntax-check playbooks/bootstrap.yml
 
 Most settings live in `group_vars/all.yml`, including paths, static service IPs, DNS records, package lists, tool versions, host resolver behavior, GitLab migration gates, registry auth, datastore credentials, observability images, Kubernetes add-ons, and Docker socket use for the runner.
 
+Bootstrap also looks for ignored, machine-local extension variables at `cluster/devastation-local-vars.yml`. This lets a local cluster register DNS names, CA leaf certificates, and portal links at build time without teaching the main repo what that cluster is for.
+
 ## User Setup
 
 The `user_setup` role installs language version managers for the target user:
@@ -173,6 +175,16 @@ Non-browser endpoints:
 - Postgres development DB: `postgres://devastation:devastation@development-db.deva.station:5432/development_db`
 - Postgres production DB: `postgres://devastation:devastation@production-db.deva.station:5432/production_db`
 - Postgres OTel DB: `postgres://devastation:devastation@otel-db.deva.station:5432/otel_db`
+
+Ignored local cluster variables can add to the portal during bootstrap. Any `devastation_extra_dns_records` are shown as generic HTTPS cluster sites by default, and a local cluster can provide richer entries through `devastation_portal_extra_browser_links` or extra non-browser entries through `devastation_portal_extra_endpoint_links`:
+
+```yaml
+devastation_portal_extra_browser_links:
+  - name: Example App
+    href: https://example.deva.station
+    kind: cluster
+    description: Locally deployed application.
+```
 
 ## Registry
 

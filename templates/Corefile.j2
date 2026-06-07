@@ -5,6 +5,9 @@
 {% for record in devastation_dns_records %}
         {{ record.ip }} {{ record.name }}
 {% endfor %}
+{% for record in devastation_extra_dns_records %}
+        {{ record.ip }} {{ record.name }}
+{% endfor %}
         fallthrough
     }
 }

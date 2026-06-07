@@ -67,7 +67,7 @@ run_root() {
 }
 
 status=0
-for fqdn in{% for record in devastation_dns_records %} {{ record.name }}{% endfor %}; do
+for fqdn in{% for record in devastation_dns_records %} {{ record.name }}{% endfor %}{% for record in devastation_extra_dns_records %} {{ record.name }}{% endfor %}; do
   check "dns ${fqdn}" getent hosts "${fqdn}" || status=1
 done
 

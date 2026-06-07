@@ -1,4 +1,5 @@
 .devastation-git/
+cluster/
 *.log
 error.txt
 node_modules/
