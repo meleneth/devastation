@@ -103,6 +103,9 @@ check "Helm installed" helm version --short || status=1
 check "k9s installed" k9s version || status=1
 check "lazydocker installed" lazydocker --version || status=1
 check "trivy installed" trivy --version || status=1
+{% if ghostty_install_enabled %}
+check "Ghostty installed" ghostty --version || status=1
+{% endif %}
 {% if kind_install_platform_addons %}
 check "Istio installed" kubectl -n istio-system get deployment istiod || status=1
 check "Argo CD installed" kubectl -n argocd get deployment argocd-server || status=1

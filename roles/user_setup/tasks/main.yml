@@ -8,6 +8,7 @@
       - libffi-dev
       - libgdbm-dev
       - libgdbm-compat-dev
+      - libgmp-dev
       - liblzma-dev
       - libncurses-dev
       - libreadline-dev
@@ -17,6 +18,7 @@
       - llvm
       - tk-dev
       - uuid-dev
+      - xz-utils
       - zlib1g-dev
     state: present
 
@@ -26,7 +28,7 @@
     dest: "{{ pyenv_root }}"
     version: master
     recursive: false
-    update: false
+    update: "{{ user_setup_install_latest_versions | bool }}"
   become: true
   become_user: "{{ devastation_user }}"
 
@@ -36,7 +38,7 @@
     dest: "{{ rbenv_root }}"
     version: master
     recursive: false
-    update: false
+    update: "{{ user_setup_install_latest_versions | bool }}"
   become: true
   become_user: "{{ devastation_user }}"
 
@@ -54,7 +56,7 @@
     dest: "{{ rbenv_root }}/plugins/ruby-build"
     version: master
     recursive: false
-    update: false
+    update: "{{ user_setup_install_latest_versions | bool }}"
   become: true
   become_user: "{{ devastation_user }}"
 
@@ -76,6 +78,16 @@
     version: "{{ nvm_version }}"
     recursive: false
     update: false
+  become: true
+  become_user: "{{ devastation_user }}"
+
+- name: Clone tfenv for target user
+  ansible.builtin.git:
+    repo: "{{ tfenv_repo }}"
+    dest: "{{ tfenv_root }}"
+    version: master
+    recursive: false
+    update: "{{ user_setup_install_latest_versions | bool }}"
   become: true
   become_user: "{{ devastation_user }}"
 
@@ -122,3 +134,337 @@
       if [ -s "$NVM_DIR/nvm.sh" ]; then
         . "$NVM_DIR/nvm.sh"
       fi
+
+- name: Add tfenv initialization to profile
+  ansible.builtin.blockinfile:
+    path: "{{ user_setup_shell_profile }}"
+    create: true
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+    marker: "# {mark} DEVASTATION TFENV"
+    block: |
+      export TFENV_ROOT="$HOME/.tfenv"
+      if [ -d "$TFENV_ROOT/bin" ]; then
+        export PATH="$TFENV_ROOT/bin:$PATH"
+      fi
+
+- name: Add package cache defaults to profile
+  ansible.builtin.blockinfile:
+    path: "{{ user_setup_shell_profile }}"
+    create: true
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+    marker: "# {mark} DEVASTATION PACKAGE MIRRORS"
+    block: |
+      export NPM_CONFIG_REGISTRY="{{ user_setup_npm_registry }}"
+      export PIP_INDEX_URL="{{ user_setup_pip_index_url }}"
+      export GEM_SOURCE="{{ user_setup_gem_source }}"
+  when: user_setup_configure_package_mirrors
+
+- name: Resolve latest stable CPython version
+  ansible.builtin.shell: |
+    set -euo pipefail
+    "{{ pyenv_root }}/bin/pyenv" install --list \
+      | sed -nE 's/^[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' \
+      | sort -V \
+      | tail -n 1
+  args:
+    executable: /bin/bash
+  register: latest_python_version
+  changed_when: false
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Check active pyenv global version
+  ansible.builtin.command:
+    argv:
+      - "{{ pyenv_root }}/bin/pyenv"
+      - global
+  register: active_python_version
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Assert latest stable CPython version resolved
+  ansible.builtin.assert:
+    that:
+      - latest_python_version.stdout | length > 0
+    fail_msg: "Unable to resolve the latest stable CPython version from pyenv."
+  when: user_setup_install_latest_versions
+
+- name: Install latest stable CPython version
+  ansible.builtin.command:
+    argv:
+      - "{{ pyenv_root }}/bin/pyenv"
+      - install
+      - -s
+      - "{{ latest_python_version.stdout }}"
+  args:
+    creates: "{{ pyenv_root }}/versions/{{ latest_python_version.stdout }}/bin/python"
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Set latest stable CPython as pyenv global
+  ansible.builtin.command:
+    argv:
+      - "{{ pyenv_root }}/bin/pyenv"
+      - global
+      - "{{ latest_python_version.stdout }}"
+  changed_when: active_python_version.stdout | default('') != latest_python_version.stdout
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Configure pip to use PyPI cache
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export PYENV_ROOT="{{ pyenv_root }}"
+    export PATH="{{ pyenv_root }}/bin:$PATH"
+    current_index="$("{{ pyenv_root }}/bin/pyenv" exec python -m pip config get global.index-url 2>/dev/null || true)"
+    "{{ pyenv_root }}/bin/pyenv" exec python -m pip config set global.index-url "{{ user_setup_pip_index_url }}"
+    test "$current_index" != "{{ user_setup_pip_index_url }}"
+  args:
+    executable: /bin/bash
+  register: pip_mirror_config
+  changed_when: pip_mirror_config.rc == 0
+  failed_when: pip_mirror_config.rc not in [0, 1]
+  become: true
+  become_user: "{{ devastation_user }}"
+  when:
+    - user_setup_install_latest_versions
+    - user_setup_configure_package_mirrors
+
+- name: Resolve latest stable Ruby version
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export RBENV_ROOT="{{ rbenv_root }}"
+    export PATH="{{ rbenv_root }}/bin:$PATH"
+    eval "$("{{ rbenv_root }}/bin/rbenv" init - bash)"
+    "{{ rbenv_root }}/bin/rbenv" install -l \
+      | sed -nE 's/^([0-9]+\.[0-9]+\.[0-9]+)$/\1/p' \
+      | sort -V \
+      | tail -n 1
+  args:
+    executable: /bin/bash
+  register: latest_ruby_version
+  changed_when: false
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Assert latest stable Ruby version resolved
+  ansible.builtin.assert:
+    that:
+      - latest_ruby_version.stdout | length > 0
+    fail_msg: "Unable to resolve the latest stable Ruby version from rbenv/ruby-build."
+  when: user_setup_install_latest_versions
+
+- name: Check active rbenv global version
+  ansible.builtin.command:
+    argv:
+      - "{{ rbenv_root }}/bin/rbenv"
+      - global
+  register: active_ruby_version
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Install latest stable Ruby version
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export RBENV_ROOT="{{ rbenv_root }}"
+    export PATH="{{ rbenv_root }}/bin:$PATH"
+    eval "$("{{ rbenv_root }}/bin/rbenv" init - bash)"
+    "{{ rbenv_root }}/bin/rbenv" install -s "{{ latest_ruby_version.stdout }}"
+  args:
+    executable: /bin/bash
+    creates: "{{ rbenv_root }}/versions/{{ latest_ruby_version.stdout }}/bin/ruby"
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Set latest stable Ruby as rbenv global
+  ansible.builtin.command:
+    argv:
+      - "{{ rbenv_root }}/bin/rbenv"
+      - global
+      - "{{ latest_ruby_version.stdout }}"
+  changed_when: active_ruby_version.stdout | default('') != latest_ruby_version.stdout
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Configure RubyGems and Bundler to use Gemstash cache
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export RBENV_ROOT="{{ rbenv_root }}"
+    export PATH="{{ rbenv_root }}/bin:$PATH"
+    eval "$("{{ rbenv_root }}/bin/rbenv" init - bash)"
+
+    gem sources --add "{{ user_setup_gem_source }}"
+    gem sources --remove https://rubygems.org/ || true
+
+    if command -v bundle >/dev/null 2>&1; then
+      bundle config set mirror.https://rubygems.org "{{ user_setup_gem_source }}"
+    fi
+  args:
+    executable: /bin/bash
+  register: ruby_mirror_config
+  changed_when: >-
+    'added to sources' in ruby_mirror_config.stdout
+    or 'You are replacing' in ruby_mirror_config.stderr
+  become: true
+  become_user: "{{ devastation_user }}"
+  when:
+    - user_setup_install_latest_versions
+    - user_setup_configure_package_mirrors
+
+- name: Resolve latest Node.js LTS version
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_root }}"
+    . "$NVM_DIR/nvm.sh"
+    nvm version-remote --lts
+  args:
+    executable: /bin/bash
+  register: latest_node_version
+  changed_when: false
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Assert latest Node.js LTS version resolved
+  ansible.builtin.assert:
+    that:
+      - latest_node_version.stdout | length > 0
+      - latest_node_version.stdout != "N/A"
+    fail_msg: "Unable to resolve the latest Node.js LTS version from nvm."
+  when: user_setup_install_latest_versions
+
+- name: Check active nvm default version
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_root }}"
+    . "$NVM_DIR/nvm.sh"
+    nvm version default
+  args:
+    executable: /bin/bash
+  register: active_node_version
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Install latest Node.js LTS version
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_root }}"
+    . "$NVM_DIR/nvm.sh"
+    nvm install --lts
+    nvm alias default "{{ latest_node_version.stdout }}"
+  args:
+    executable: /bin/bash
+    creates: "{{ nvm_root }}/versions/node/{{ latest_node_version.stdout }}/bin/node"
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Set latest Node.js LTS as nvm default
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_root }}"
+    . "$NVM_DIR/nvm.sh"
+    nvm alias default "{{ latest_node_version.stdout }}"
+  args:
+    executable: /bin/bash
+  changed_when: active_node_version.stdout | default('') != latest_node_version.stdout
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Configure npm to use Verdaccio cache
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_root }}"
+    . "$NVM_DIR/nvm.sh"
+    nvm use default
+    current_registry="$(npm config get registry)"
+    npm config set registry "{{ user_setup_npm_registry }}"
+    test "$current_registry" != "{{ user_setup_npm_registry }}"
+  args:
+    executable: /bin/bash
+  register: npm_mirror_config
+  changed_when: npm_mirror_config.rc == 0
+  failed_when: npm_mirror_config.rc not in [0, 1]
+  become: true
+  become_user: "{{ devastation_user }}"
+  when:
+    - user_setup_install_latest_versions
+    - user_setup_configure_package_mirrors
+
+- name: Resolve latest stable Terraform version
+  ansible.builtin.command:
+    argv:
+      - "{{ tfenv_root }}/bin/tfenv"
+      - list-remote
+  register: terraform_remote_versions
+  changed_when: false
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Set latest stable Terraform version fact
+  ansible.builtin.set_fact:
+    latest_terraform_version: "{{ terraform_remote_versions.stdout_lines | reject('search', '-') | first }}"
+  when: user_setup_install_latest_versions
+
+- name: Assert latest stable Terraform version resolved
+  ansible.builtin.assert:
+    that:
+      - latest_terraform_version | length > 0
+    fail_msg: "Unable to resolve the latest stable Terraform version from tfenv."
+  when: user_setup_install_latest_versions
+
+- name: Check active tfenv version
+  ansible.builtin.command:
+    argv:
+      - "{{ tfenv_root }}/bin/tfenv"
+      - version-name
+  register: active_terraform_version
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Install latest stable Terraform version
+  ansible.builtin.command:
+    argv:
+      - "{{ tfenv_root }}/bin/tfenv"
+      - install
+      - "{{ latest_terraform_version }}"
+  args:
+    creates: "{{ tfenv_root }}/versions/{{ latest_terraform_version }}/terraform"
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Set latest stable Terraform as tfenv global
+  ansible.builtin.command:
+    argv:
+      - "{{ tfenv_root }}/bin/tfenv"
+      - use
+      - "{{ latest_terraform_version }}"
+  changed_when: active_terraform_version.stdout | default('') != latest_terraform_version
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions

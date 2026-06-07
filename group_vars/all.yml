@@ -172,6 +172,11 @@ base_packages_default:
 user_setup_enabled: true
 user_setup_home: "{{ lookup('ansible.builtin.env', 'HOME') }}"
 user_setup_shell_profile: "{{ user_setup_home }}/.profile"
+user_setup_install_latest_versions: true
+user_setup_configure_package_mirrors: true
+user_setup_npm_registry: "http://npm-cache.{{ devastation_domain }}:{{ npm_cache_port }}"
+user_setup_pip_index_url: "http://pypi-cache.{{ devastation_domain }}:{{ pypi_cache_port }}/root/pypi/+simple/"
+user_setup_gem_source: "http://gem-cache.{{ devastation_domain }}:{{ gem_cache_port }}"
 pyenv_repo: https://github.com/pyenv/pyenv.git
 pyenv_root: "{{ user_setup_home }}/.pyenv"
 rbenv_repo: https://github.com/rbenv/rbenv.git
@@ -180,6 +185,8 @@ ruby_build_repo: https://github.com/rbenv/ruby-build.git
 nvm_repo: https://github.com/nvm-sh/nvm.git
 nvm_version: v0.40.1
 nvm_root: "{{ user_setup_home }}/.nvm"
+tfenv_repo: https://github.com/tfutils/tfenv.git
+tfenv_root: "{{ user_setup_home }}/.tfenv"
 
 meslo_lgs_nerd_font_enabled: true
 meslo_lgs_nerd_font_base_url: https://raw.githubusercontent.com/romkatv/powerlevel10k-media/master
@@ -301,6 +308,9 @@ helm_version: v4.2.0
 k9s_version: v0.50.18
 lazydocker_version: 0.25.0
 trivy_version: 0.70.0
+ghostty_install_enabled: true
+ghostty_community_deb_enabled: true
+ghostty_community_release_api: https://api.github.com/repos/mkasberg/ghostty-ubuntu/releases/latest
 istio_version: 1.30.0
 argocd_version: v3.4.2
 otel_operator_version: v0.151.0

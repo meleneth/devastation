@@ -35,7 +35,7 @@ The current feature set includes:
 - Local HTTPS Docker registry plus Docker Hub pull-through cache
 - Package caching for apt, npm, PyPI, and RubyGems
 - KIND with local registry trust, cert-manager, Istio, Argo CD, and the OpenTelemetry Operator
-- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Neovim, pyenv, rbenv, ruby-build, nvm, and MesloLGS Nerd Font
+- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, and MesloLGS Nerd Font
 - GitLab CE and a Docker-executor GitLab Runner
 - Vault dev server, Eventline GoAWS SNS/SQS emulator, MinIO object storage, and four Postgres containers
 - Prometheus, Grafana, Loki, Jaeger v2, OpenTelemetry Collector, node-exporter, cAdvisor, registry metrics, and Postgres exporters
@@ -81,12 +81,15 @@ The `user_setup` role installs language version managers for the target user:
 - `rbenv` in `~/.rbenv`
 - `ruby-build` as an rbenv plugin
 - `nvm` in `~/.nvm`
+- `tfenv` in `~/.tfenv`
 
-Initialization blocks are added to the configured profile, defaulting to `~/.profile`. The role does not install Python, Ruby, or Node versions by default; it installs the managers so you can choose versions locally.
+Initialization blocks are added to the configured profile, defaulting to `~/.profile`. By default, `user_setup_install_latest_versions: true` also installs and selects the latest non-beta Python, Ruby, and Terraform versions plus the latest Node.js LTS available through those managers. Set it to `false` to install only the managers. With `user_setup_configure_package_mirrors: true`, the role also configures npm, pip, RubyGems, and Bundler to use the local package caches.
 
 The `fonts` role installs the patched MesloLGS Nerd Font files from `romkatv/powerlevel10k-media` system-wide under `/usr/local/share/fonts/devastation/MesloLGS` and refreshes the font cache.
 
 The `neovim` role installs the latest official upstream Linux x86_64 Neovim release from GitHub, links it at `/usr/local/bin/nvim`, and removes the old distro `neovim` package by default. It installs LazyVim from the official starter repo only when no user config exists. If the previous generated minimal devastation config is present, it is moved aside to a timestamped backup before LazyVim is installed.
+
+The `dev_tools` role installs Ghostty when `ghostty_install_enabled: true`. It uses an existing `ghostty` apt package when available, then falls back to the community-maintained Debian/Ubuntu `.deb` package when `ghostty_community_deb_enabled: true`.
 
 Refresh the official Neovim tarball intentionally:
 
@@ -217,7 +220,7 @@ The environment also runs local proxy caches for common language ecosystems:
 - Python: `http://pypi-cache.deva.station:3141/root/pypi/+simple/` using devpi
 - Ruby: `http://gem-cache.deva.station:9292` using Gemstash
 
-Use these in local shells or automation:
+The `user_setup` role applies these automatically by default. Use these manually in local shells or automation that has not been bootstrapped yet:
 
 ```bash
 npm config set registry http://npm-cache.deva.station:4873
@@ -305,7 +308,7 @@ MinIO is pinned to a known community image tag because current MinIO community i
 
 The host toolchain includes Helm, kubectl, K9s, Lazydocker, and Trivy. The KIND cluster is configured with the local registry trust and is bootstrapped with cert-manager, Istio, Argo CD, and the OpenTelemetry Operator when `kind_install_platform_addons` is enabled.
 
-Default versions are pinned in `group_vars/all.yml`: KIND `v0.23.0`, kubectl `v1.30.2`, node image `kindest/node:v1.30.0`, Helm `v4.2.0`, K9s `v0.50.18`, Lazydocker `0.25.0`, Trivy `0.70.0`, Istio `1.30.0`, Argo CD `v3.4.2`, and OpenTelemetry Operator `v0.151.0`.
+Default versions are pinned in `group_vars/all.yml`: KIND `v0.23.0`, kubectl `v1.30.2`, node image `kindest/node:v1.30.0`, Helm `v4.2.0`, K9s `v0.50.18`, Lazydocker `0.25.0`, Trivy `0.70.0`, Istio `1.30.0`, Argo CD `v3.4.2`, and OpenTelemetry Operator `v0.151.0`. Ghostty uses the available apt package or the latest supported community Debian/Ubuntu package.
 
 ## GitLab
 
@@ -414,4 +417,4 @@ Dangerous options and sensitive defaults are explicit in `group_vars/all.yml`:
 - `minio_root_password`
 - `grafana_admin_password`
 
-Privileged surfaces are documented here: Docker itself, GitLab in Docker, KIND nodes, Kubernetes admin access, optional Docker socket mounting for runner jobs, Vault dev mode, cAdvisor host mounts, node-exporter host PID/rootfs mounts, local object/database services with default credentials, and security-tool downloads such as Trivy.
+Privileged surfaces are documented here: Docker itself, GitLab in Docker, KIND nodes, Kubernetes admin access, optional Docker socket mounting for runner jobs, Vault dev mode, cAdvisor host mounts, node-exporter host PID/rootfs mounts, local object/database services with default credentials, and tool/security-tool downloads such as Ghostty and Trivy.
