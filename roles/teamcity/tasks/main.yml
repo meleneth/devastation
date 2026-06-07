@@ -1,0 +1,19 @@
+---
+- name: Create TeamCity directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ devastation_paths.teamcity }}"
+    - "{{ devastation_paths.teamcity }}/data"
+    - "{{ devastation_paths.teamcity }}/logs"
+
+- name: Start TeamCity service
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - teamcity
+    state: present

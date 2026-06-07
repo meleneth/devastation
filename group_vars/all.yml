@@ -13,6 +13,7 @@ devastation_subnets:
   gitlab: 172.30.42.14
   runner: 172.30.42.15
   registry_cache: 172.30.42.16
+  teamcity: 172.30.42.36
   npm_cache: 172.30.42.28
   pypi_cache: 172.30.42.29
   gem_cache: 172.30.42.30
@@ -56,6 +57,8 @@ devastation_dns_records:
     ip: "{{ devastation_subnets.gitlab }}"
   - name: "runner.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.runner }}"
+  - name: "teamcity.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.teamcity }}"
   - name: "kind.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.kind }}"
   - name: "otel-collector.{{ devastation_domain }}"
@@ -101,6 +104,7 @@ devastation_internal_hostnames:
   - "gem-cache.{{ devastation_domain }}"
   - "gitlab.{{ devastation_domain }}"
   - "runner.{{ devastation_domain }}"
+  - "teamcity.{{ devastation_domain }}"
   - "kind.{{ devastation_domain }}"
   - "otel-collector.{{ devastation_domain }}"
   - "grafana.{{ devastation_domain }}"
@@ -132,6 +136,7 @@ devastation_paths:
   gitlab_runner: "{{ devastation_root }}/gitlab-runner"
   observability: "{{ devastation_root }}/observability"
   vault: "{{ devastation_root }}/vault"
+  teamcity: "{{ devastation_root }}/teamcity"
   eventline: "{{ devastation_root }}/eventline"
   storage: "{{ devastation_root }}/storage"
   www: "{{ devastation_root }}/www"
@@ -375,6 +380,11 @@ postgres_databases:
 vault_version: "1.19.5"
 vault_dev_root_token: devastation
 vault_port: 8200
+vault_cli_install_enabled: true
+vault_cli_archive: /tmp/devastation-vault_{{ vault_version }}_linux_amd64.zip
+vault_cli_release_url: https://releases.hashicorp.com/vault/{{ vault_version }}/vault_{{ vault_version }}_linux_amd64.zip
+teamcity_image: jetbrains/teamcity-server:latest
+teamcity_port: 8111
 goaws_image: admiralpiett/goaws:v0.5.4
 goaws_port: 4100
 minio_image: minio/minio:RELEASE.2025-04-22T22-12-26Z

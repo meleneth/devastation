@@ -34,6 +34,7 @@
         - { path: "{{ devastation_paths.compose }}", mode: "0755" }
         - { path: "{{ devastation_paths.observability }}", mode: "0755" }
         - { path: "{{ devastation_paths.vault }}", mode: "0755" }
+        - { path: "{{ devastation_paths.teamcity }}", mode: "0755" }
         - { path: "{{ devastation_paths.eventline }}", mode: "0755" }
         - { path: "{{ devastation_paths.storage }}", mode: "0755" }
         - { path: "{{ devastation_paths.package_caches }}", mode: "0755" }
@@ -130,6 +131,10 @@
     - name: Apply observability role
       ansible.builtin.import_role:
         name: observability
+
+    - name: Apply TeamCity role
+      ansible.builtin.import_role:
+        name: teamcity
 
     - name: Apply GitLab role
       ansible.builtin.import_role:

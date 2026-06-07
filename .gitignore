@@ -1,3 +1,7 @@
 .devastation-git/
 *.log
 error.txt
+node_modules/
+docs/.vitepress/.temp/
+docs/.vitepress/cache/
+docs/.vitepress/dist/

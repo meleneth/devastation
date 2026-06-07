@@ -21,6 +21,7 @@ Persistent state defaults to `/srv/devastation`:
 - `/srv/devastation/gitlab-runner`: GitLab Runner config
 - `/srv/devastation/observability`: Prometheus, Grafana, Loki, Jaeger, and OTel configuration/data
 - `/srv/devastation/vault`: Vault dev-mode data
+- `/srv/devastation/teamcity`: TeamCity server data and logs
 - `/srv/devastation/eventline`: Eventline GoAWS configuration/data
 - `/srv/devastation/storage`: MinIO object data
 - `/srv/devastation/www`: static `deva.station` / `www.deva.station` portal files and nginx config
@@ -112,6 +113,7 @@ These names are served under `deva.station`:
 - `gem-cache.deva.station`
 - `gitlab.deva.station`
 - `runner.deva.station`
+- `teamcity.deva.station`
 - `kind.deva.station`
 - `otel-collector.deva.station`
 - `grafana.deva.station`
@@ -141,6 +143,7 @@ Browser-friendly local links:
 - [Jaeger](http://jaeger.deva.station:16686)
 - [Loki readiness](http://loki.deva.station:3100/ready)
 - [Vault](http://vault.deva.station:8200)
+- [TeamCity](http://teamcity.deva.station:8111)
 - [Eventline GoAWS](http://eventline.deva.station:4100)
 - [MinIO API](http://storage.deva.station:9000)
 - [MinIO Console](http://storage.deva.station:9001)
@@ -248,6 +251,19 @@ gem install rake --source http://gem-cache.deva.station:9292
 
 Share [AGENTS.md](AGENTS.md) with coding agents so they use the local caches instead of going directly to public package registries.
 
+## Project Docs
+
+User-facing runbooks live under `docs/` and are built with VitePress. They cover GitLab first-run tasks, runner registration, Vault usage, TeamCity, and the SNS/SQS/S3-style local services.
+
+Run the docs locally:
+
+```bash
+npm install
+npm run docs:dev
+```
+
+GitHub Pages publishing is configured in `.github/workflows/docs.yml`.
+
 ## DNS Notes
 
 CoreDNS runs in Docker and binds `127.0.0.1:53` for host access. Service names are mapped to fixed addresses on the private Docker bridge defined by `devastation_subnets.services`, defaulting to `172.30.42.0/24`; the `devastation_dns_records` list is the source of truth for CoreDNS and `/etc/hosts`. Ansible also writes static `deva.station` entries to `/etc/hosts` by default so browser and CLI access work even on systems without `systemd-resolved`. If `systemd-resolved` is present, Ansible configures a drop-in at `/etc/systemd/resolved.conf.d/devastation.conf`, using split DNS for `deva.station`.
@@ -297,6 +313,7 @@ New hostnames require a full automated rotation because there is no retained CA 
 The compose project includes local dev data services and an observability stack:
 
 - Vault dev server: `http://vault.deva.station:8200`, root token `devastation`
+- TeamCity CI server: `http://teamcity.deva.station:8111`
 - Eventline GoAWS SNS/SQS emulator: `http://eventline.deva.station:4100`
 - MinIO object storage: `http://storage.deva.station:9000`, console `http://storage.deva.station:9001`, root credentials `devastation` / `devastation`
 - Postgres 18 containers: `test-db`, `development-db`, `production-db`, and `otel-db`, exposed on host ports `5433` through `5436` with default credentials `devastation` / `devastation`
@@ -392,7 +409,7 @@ Reset KIND only:
 Inspect logs:
 
 ```bash
-docker compose -f /srv/devastation/compose/compose.yml logs -f dns www registry registry-cache apt-cache vault eventline storage test-db development-db production-db otel-db prometheus grafana loki jaeger otel-collector node-exporter cadvisor gitlab gitlab-runner
+docker compose -f /srv/devastation/compose/compose.yml logs -f dns www registry registry-cache apt-cache vault teamcity eventline storage test-db development-db production-db otel-db prometheus grafana loki jaeger otel-collector node-exporter cadvisor gitlab gitlab-runner
 ```
 
 Regenerate by convergence:

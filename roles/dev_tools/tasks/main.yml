@@ -109,6 +109,33 @@
     deb: "/tmp/trivy_{{ trivy_version }}_Linux-64bit.deb"
   when: not trivy_binary.stat.exists
 
+- name: Check Vault CLI binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/vault
+  register: vault_cli_binary
+  when: vault_cli_install_enabled
+
+- name: Download Vault CLI archive
+  ansible.builtin.get_url:
+    url: "{{ vault_cli_release_url }}"
+    dest: "{{ vault_cli_archive }}"
+    mode: "0644"
+  when:
+    - vault_cli_install_enabled
+    - not vault_cli_binary.stat.exists
+
+- name: Extract Vault CLI
+  ansible.builtin.unarchive:
+    src: "{{ vault_cli_archive }}"
+    dest: /usr/local/bin
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - vault_cli_install_enabled
+    - not vault_cli_binary.stat.exists
+
 - name: Check Ghostty binary
   ansible.builtin.stat:
     path: /usr/bin/ghostty

@@ -129,6 +129,18 @@ services:
       devastation:
         ipv4_address: {{ devastation_subnets.vault }}
 
+  teamcity:
+    image: {{ teamcity_image }}
+    restart: unless-stopped
+    ports:
+      - "{{ teamcity_port }}:8111"
+    volumes:
+      - {{ devastation_paths.teamcity }}/data:/data/teamcity_server/datadir
+      - {{ devastation_paths.teamcity }}/logs:/opt/teamcity/logs
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.teamcity }}
+
   eventline:
     image: {{ goaws_image }}
     restart: unless-stopped

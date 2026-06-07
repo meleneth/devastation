@@ -227,6 +227,18 @@
         docker push "$target"
       }
 
+- name: Add Vault defaults to profile
+  ansible.builtin.blockinfile:
+    path: "{{ user_setup_shell_profile }}"
+    create: true
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+    marker: "# {mark} DEVASTATION VAULT"
+    block: |
+      export VAULT_ADDR="http://vault.{{ devastation_domain }}:{{ vault_port }}"
+      export VAULT_TOKEN="{{ vault_dev_root_token }}"
+
 - name: Resolve latest stable CPython version
   ansible.builtin.shell: |
     set -euo pipefail
