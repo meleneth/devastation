@@ -308,6 +308,8 @@ kind_version: v0.23.0
 kubectl_version: v1.30.2
 kind_node_image: kindest/node:v1.30.0
 kind_api_port: 6443
+kind_configure_user_kubeconfig: true
+kind_user_kubeconfig: "{{ user_setup_home }}/.kube/config"
 helm_version: v4.2.0
 k9s_version: v0.50.18
 lazydocker_version: 0.25.0

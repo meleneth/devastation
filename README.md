@@ -314,7 +314,7 @@ MinIO is pinned to a known community image tag because current MinIO community i
 
 ## Kubernetes And Tools
 
-The host toolchain includes Helm, kubectl, K9s, Lazydocker, and Trivy. The KIND cluster is configured with the local registry trust and is bootstrapped with cert-manager, Istio, Argo CD, and the OpenTelemetry Operator when `kind_install_platform_addons` is enabled.
+The host toolchain includes Helm, kubectl, K9s, Lazydocker, and Trivy. The KIND cluster is configured with the local registry trust and is bootstrapped with cert-manager, Istio, Argo CD, and the OpenTelemetry Operator when `kind_install_platform_addons` is enabled. By default, the KIND kubeconfig is exported to the target user's `~/.kube/config`, so `kubectl` and `k9s` use the `devastation` cluster without extra environment variables.
 
 Default versions are pinned in `group_vars/all.yml`: KIND `v0.23.0`, kubectl `v1.30.2`, node image `kindest/node:v1.30.0`, Helm `v4.2.0`, K9s `v0.50.18`, Lazydocker `0.25.0`, Trivy `0.70.0`, Istio `1.30.0`, Argo CD `v3.4.2`, and OpenTelemetry Operator `v0.151.0`. Ghostty uses the available apt package or the latest supported community Debian/Ubuntu package.
 

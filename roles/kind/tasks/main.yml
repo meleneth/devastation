@@ -53,6 +53,51 @@
   register: kind_nodes
   changed_when: false
 
+- name: Ensure target user kubeconfig directory exists
+  ansible.builtin.file:
+    path: "{{ kind_user_kubeconfig | dirname }}"
+    state: directory
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0700"
+  when: kind_configure_user_kubeconfig | bool
+
+- name: Check target user kubeconfig context
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - config
+      - current-context
+      - --kubeconfig
+      - "{{ kind_user_kubeconfig }}"
+  register: kind_user_kubeconfig_context
+  changed_when: false
+  failed_when: false
+  when: kind_configure_user_kubeconfig | bool
+
+- name: Export KIND kubeconfig for target user
+  ansible.builtin.command:
+    argv:
+      - kind
+      - export
+      - kubeconfig
+      - --name
+      - "{{ kind_cluster_name }}"
+      - --kubeconfig
+      - "{{ kind_user_kubeconfig }}"
+  register: kind_user_kubeconfig_export
+  changed_when: kind_user_kubeconfig_context.stdout | default('') != 'kind-{{ kind_cluster_name }}'
+  when: kind_configure_user_kubeconfig | bool
+
+- name: Ensure target user owns kubeconfig
+  ansible.builtin.file:
+    path: "{{ kind_user_kubeconfig }}"
+    state: file
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0600"
+  when: kind_configure_user_kubeconfig | bool
+
 - name: Connect KIND nodes to devastation network
   ansible.builtin.shell: |
     set -eu
