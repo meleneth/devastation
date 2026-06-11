@@ -36,7 +36,7 @@ The current feature set includes:
 - Local HTTPS Docker registry plus Docker Hub pull-through cache
 - Package caching for apt, npm, PyPI, and RubyGems
 - KIND with local registry trust, cert-manager, Istio, Argo CD, and the OpenTelemetry Operator
-- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, and MesloLGS Nerd Font
+- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, latest official Blender, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, and MesloLGS Nerd Font
 - GitLab CE and a Docker-executor GitLab Runner
 - Vault dev server, Eventline GoAWS SNS/SQS emulator, MinIO object storage, and four Postgres containers
 - Prometheus, Grafana, Loki, Jaeger v2, OpenTelemetry Collector, node-exporter, cAdvisor, registry metrics, and Postgres exporters
@@ -93,6 +93,8 @@ The `fonts` role installs the patched MesloLGS Nerd Font files from `romkatv/pow
 The `neovim` role installs the latest official upstream Linux x86_64 Neovim release from GitHub, links it at `/usr/local/bin/nvim`, and removes the old distro `neovim` package by default. It installs LazyVim from the official starter repo only when no user config exists. If the previous generated minimal devastation config is present, it is moved aside to a timestamped backup before LazyVim is installed.
 
 The `dev_tools` role installs Ghostty when `ghostty_install_enabled: true`. It uses an existing `ghostty` apt package when available, then falls back to the community-maintained Debian/Ubuntu `.deb` package when `ghostty_community_deb_enabled: true`.
+
+The `dev_tools` role removes the distro `blender` package when `blender_remove_distro_package: true`, resolves the newest official Linux x64 Blender release from `download.blender.org` each run, installs it under `/opt/blender/current`, and links it at `/usr/local/bin/blender`.
 
 Refresh the official Neovim tarball intentionally:
 
@@ -205,6 +207,17 @@ Acceptance flow:
 ```
 
 That builds `registry.deva.station/devastation/hello:local`, pushes it, pulls it, deploys it into KIND, and verifies DNS from a pod.
+
+Cluster project deploy flow:
+
+```bash
+bin/devastation-deploy-cluster-project multifractory
+```
+
+That builds and pushes the project image, regenerates ignored cluster DNS/cert
+inputs, runs the main bootstrap for DNS/cert convergence, applies the cluster
+Terraform, and verifies rollout, DNS, and HTTPS. The current project contract
+is documented in `docs/cluster-projects.md`.
 
 Registry auth is disabled by default for simple local use. Set `registry_enable_auth: true` only after adding htpasswd material under `/srv/devastation/registry/auth/htpasswd`.
 
@@ -345,7 +358,7 @@ MinIO is pinned to a known community image tag because current MinIO community i
 
 The host toolchain includes Helm, kubectl, K9s, Lazydocker, and Trivy. The KIND cluster is configured with the local registry trust and is bootstrapped with cert-manager, Istio, Argo CD, and the OpenTelemetry Operator when `kind_install_platform_addons` is enabled. By default, the KIND kubeconfig is exported to the target user's `~/.kube/config`, so `kubectl` and `k9s` use the `devastation` cluster without extra environment variables.
 
-Default versions are pinned in `group_vars/all.yml`: KIND `v0.23.0`, kubectl `v1.30.2`, node image `kindest/node:v1.30.0`, Helm `v4.2.0`, K9s `v0.50.18`, Lazydocker `0.25.0`, Trivy `0.70.0`, Istio `1.30.0`, Argo CD `v3.4.2`, and OpenTelemetry Operator `v0.151.0`. Ghostty uses the available apt package or the latest supported community Debian/Ubuntu package.
+Default versions are pinned in `group_vars/all.yml`: KIND `v0.23.0`, kubectl `v1.30.2`, node image `kindest/node:v1.30.0`, Helm `v4.2.0`, K9s `v0.50.18`, Lazydocker `0.25.0`, Trivy `0.70.0`, Istio `1.30.0`, Argo CD `v3.4.2`, and OpenTelemetry Operator `v0.151.0`. Ghostty uses the available apt package or the latest supported community Debian/Ubuntu package. Blender deliberately is not pinned; it resolves the latest official Linux x64 release during convergence.
 
 ## GitLab
 

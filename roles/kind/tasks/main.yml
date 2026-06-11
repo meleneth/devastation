@@ -235,6 +235,26 @@
   changed_when: true
   when: kind_install_platform_addons | bool
 
+- name: Install Istio ingress gateway
+  ansible.builtin.command:
+    argv:
+      - helm
+      - upgrade
+      - --install
+      - "{{ istio_gateway_name }}"
+      - istio/gateway
+      - --version
+      - "{{ istio_version }}"
+      - --namespace
+      - istio-system
+      - --wait
+      - --timeout
+      - 10m
+      - --set
+      - "service.type={{ istio_gateway_service_type }}"
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
 - name: Ensure Argo CD namespace exists
   ansible.builtin.command:
     argv:
@@ -284,6 +304,19 @@
       - rollout
       - status
       - deployment/istiod
+      - --timeout=300s
+  changed_when: false
+  when: kind_install_platform_addons | bool
+
+- name: Wait for Istio ingress gateway
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - -n
+      - istio-system
+      - rollout
+      - status
+      - "deployment/{{ istio_gateway_name }}"
       - --timeout=300s
   changed_when: false
   when: kind_install_platform_addons | bool

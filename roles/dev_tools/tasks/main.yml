@@ -109,6 +109,136 @@
     deb: "/tmp/trivy_{{ trivy_version }}_Linux-64bit.deb"
   when: not trivy_binary.stat.exists
 
+- name: Remove distro Blender package
+  ansible.builtin.apt:
+    name: blender
+    state: absent
+    purge: true
+    lock_timeout: "{{ apt_lock_timeout | int }}"
+  when:
+    - blender_install_enabled | bool
+    - blender_remove_distro_package | bool
+
+- name: Create Blender install root
+  ansible.builtin.file:
+    path: "{{ blender_install_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: blender_install_enabled | bool
+
+- name: Resolve latest official Blender Linux x64 release
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      base="{{ blender_official_release_base_url }}"
+      base="${base%/}"
+      release_dir="$(
+        curl -fsSL "${base}/" \
+          | grep -oP 'href="Blender[0-9]+\.[0-9]+/' \
+          | sed -E 's/^href="(Blender[0-9]+\.[0-9]+)\/$/\1/' \
+          | sort -Vu \
+          | tail -n 1
+      )"
+
+      archive="$(
+        curl -fsSL "${base}/${release_dir}/" \
+          | grep -oP 'href="blender-[0-9]+\.[0-9]+\.[0-9]+-linux-x64\.tar\.xz"' \
+          | sed -E 's/^href="([^"]+)"/\1/' \
+          | sort -Vu \
+          | tail -n 1
+      )"
+
+      if [[ -z "$release_dir" || -z "$archive" ]]; then
+        echo "Unable to resolve latest Blender release from ${base}" >&2
+        exit 1
+      fi
+
+      version="$(sed -E 's/^blender-([0-9]+\.[0-9]+\.[0-9]+)-linux-x64\.tar\.xz$/\1/' <<<"$archive")"
+      printf '%s\n%s/%s/%s\n' "$version" "$base" "$release_dir" "$archive"
+  args:
+    executable: /bin/bash
+  register: blender_latest_release
+  changed_when: false
+  when: blender_install_enabled | bool
+
+- name: Read installed Blender version marker
+  ansible.builtin.slurp:
+    src: "{{ blender_install_root }}/VERSION"
+  register: blender_installed_version_marker
+  failed_when: false
+  changed_when: false
+  when: blender_install_enabled | bool
+
+- name: Decide whether official Blender needs install
+  ansible.builtin.set_fact:
+    blender_latest_version: "{{ blender_latest_release.stdout_lines[0] }}"
+    blender_latest_archive_url: "{{ blender_latest_release.stdout_lines[1] }}"
+    blender_install_required: >-
+      {{
+        (blender_installed_version_marker.content is not defined)
+        or ((blender_installed_version_marker.content | b64decode | trim) != blender_latest_release.stdout_lines[0])
+      }}
+  when: blender_install_enabled | bool
+
+- name: Download latest official Blender archive
+  ansible.builtin.get_url:
+    url: "{{ blender_latest_archive_url }}"
+    dest: "/tmp/blender-{{ blender_latest_version }}-linux-x64.tar.xz"
+    mode: "0644"
+  when:
+    - blender_install_enabled | bool
+    - blender_install_required | bool
+
+- name: Remove previous official Blender tree
+  ansible.builtin.file:
+    path: "{{ blender_install_root }}/current"
+    state: absent
+  when:
+    - blender_install_enabled | bool
+    - blender_install_required | bool
+
+- name: Extract latest official Blender
+  ansible.builtin.unarchive:
+    src: "/tmp/blender-{{ blender_latest_version }}-linux-x64.tar.xz"
+    dest: "{{ blender_install_root }}"
+    remote_src: true
+    owner: root
+    group: root
+  when:
+    - blender_install_enabled | bool
+    - blender_install_required | bool
+
+- name: Point Blender current symlink at latest release
+  ansible.builtin.file:
+    src: "{{ blender_install_root }}/blender-{{ blender_latest_version }}-linux-x64"
+    dest: "{{ blender_install_root }}/current"
+    state: link
+    owner: root
+    group: root
+    force: true
+  when: blender_install_enabled | bool
+
+- name: Link Blender into PATH
+  ansible.builtin.file:
+    src: "{{ blender_install_root }}/current/blender"
+    dest: "{{ blender_binary_path }}"
+    state: link
+    owner: root
+    group: root
+    force: true
+  when: blender_install_enabled | bool
+
+- name: Write installed Blender version marker
+  ansible.builtin.copy:
+    content: "{{ blender_latest_version }}\n"
+    dest: "{{ blender_install_root }}/VERSION"
+    owner: root
+    group: root
+    mode: "0644"
+  when: blender_install_enabled | bool
+
 - name: Check Vault CLI binary
   ansible.builtin.stat:
     path: /usr/local/bin/vault

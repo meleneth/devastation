@@ -185,6 +185,7 @@ base_packages_default:
   - sudo
   - unzip
   - wget
+  - xz-utils
   - yq
 
 user_setup_enabled: true
@@ -336,7 +337,14 @@ trivy_version: 0.70.0
 ghostty_install_enabled: true
 ghostty_community_deb_enabled: true
 ghostty_community_release_api: https://api.github.com/repos/mkasberg/ghostty-ubuntu/releases/latest
+blender_install_enabled: true
+blender_remove_distro_package: true
+blender_official_release_base_url: https://download.blender.org/release
+blender_install_root: /opt/blender
+blender_binary_path: /usr/local/bin/blender
 istio_version: 1.30.0
+istio_gateway_name: istio-ingressgateway
+istio_gateway_service_type: ClusterIP
 argocd_version: v3.4.2
 otel_operator_version: v0.151.0
 kind_install_platform_addons: true
@@ -411,7 +419,7 @@ minio_console_port: 9001
 www_image: nginx:1.27-alpine
 www_http_port: 80
 www_https_port: 443
-docs_build_output: /tmp/devastation-vitepress-dist
+docs_build_output: "{{ playbook_dir }}/../docs/.vitepress/dist"
 
 grafana_image: grafana/grafana-enterprise:latest
 grafana_admin_user: admin

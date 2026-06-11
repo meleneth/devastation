@@ -110,11 +110,18 @@ check "Helm installed" helm version --short || status=1
 check "k9s installed" k9s version || status=1
 check "lazydocker installed" lazydocker --version || status=1
 check "trivy installed" trivy --version || status=1
+{% if blender_install_enabled %}
+{% if blender_remove_distro_package %}
+check "distro Blender package absent" bash -c '! dpkg-query -W -f="${Status}" blender 2>/dev/null | grep -q "install ok installed"' || status=1
+{% endif %}
+check "Blender official installed" blender --version || status=1
+{% endif %}
 {% if ghostty_install_enabled %}
 check "Ghostty installed" ghostty --version || status=1
 {% endif %}
 {% if kind_install_platform_addons %}
 check "Istio installed" kubectl -n istio-system get deployment istiod || status=1
+check "Istio ingress gateway installed" kubectl -n istio-system get deployment {{ istio_gateway_name }} || status=1
 check "Argo CD installed" kubectl -n argocd get deployment argocd-server || status=1
 check "OTel operator installed" kubectl -n opentelemetry-operator-system get deployment opentelemetry-operator-controller-manager || status=1
 {% endif %}

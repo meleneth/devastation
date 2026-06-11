@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: bin/devastation-deploy-cluster-project PROJECT [options]
+
+Builds, pushes, converges DNS/certs, applies the cluster Terraform, and verifies
+a local cluster project.
+
+Current project contract:
+  - static app build context: cluster/PROJECT/Dockerfile
+  - image: registry.deva.station/devastation/PROJECT:latest
+  - hostname: PROJECT.deva.station
+  - Kubernetes namespace/deployment: PROJECT
+  - Terraform app entry already exists in cluster/terraform/locals.tf
+
+Options:
+  --plan              Run Terraform plan instead of apply.
+  --skip-build        Do not build or push the image.
+  --skip-bootstrap    Do not run the main Ansible bootstrap.
+  --skip-verify       Do not run rollout/DNS/HTTP verification.
+  -h, --help          Show this help.
+
+Examples:
+  bin/devastation-deploy-cluster-project multifractory
+  bin/devastation-deploy-cluster-project multifractory --plan
+USAGE
+}
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT="${1:-}"
+
+if [[ -z "$PROJECT" || "$PROJECT" == "-h" || "$PROJECT" == "--help" ]]; then
+  usage
+  [[ -n "$PROJECT" ]] && exit 0
+  exit 2
+fi
+shift
+
+PLAN=0
+SKIP_BUILD=0
+SKIP_BOOTSTRAP=0
+SKIP_VERIFY=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --plan)
+      PLAN=1
+      shift
+      ;;
+    --skip-build)
+      SKIP_BUILD=1
+      shift
+      ;;
+    --skip-bootstrap)
+      SKIP_BOOTSTRAP=1
+      shift
+      ;;
+    --skip-verify)
+      SKIP_VERIFY=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+CONTEXT="${ROOT}/cluster/${PROJECT}"
+IMAGE="registry.deva.station/devastation/${PROJECT}"
+HOSTNAME="${PROJECT}.deva.station"
+DEPLOY_HELPER="${ROOT}/cluster/devastation-deploy-local-cluster"
+REGISTER_HELPER="${ROOT}/cluster/devastation-register-main-script-inputs"
+TERRAFORM="${TERRAFORM:-${HOME}/.tfenv/bin/terraform}"
+
+if [[ ! -x "$TERRAFORM" ]]; then
+  TERRAFORM="$(command -v terraform || true)"
+fi
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+require_file() {
+  if [[ ! -f "$1" ]]; then
+    echo "missing required file: $1" >&2
+    exit 1
+  fi
+}
+
+require_executable() {
+  if [[ ! -x "$1" ]]; then
+    echo "missing executable helper: $1" >&2
+    exit 1
+  fi
+}
+
+require_command docker
+require_command kubectl
+require_command curl
+require_file "${CONTEXT}/Dockerfile"
+require_executable "$DEPLOY_HELPER"
+require_executable "$REGISTER_HELPER"
+
+if [[ -z "$TERRAFORM" || ! -x "$TERRAFORM" ]]; then
+  echo "terraform not found; source your shell profile or set TERRAFORM=/path/to/terraform" >&2
+  exit 1
+fi
+
+cd "$ROOT"
+
+BOOTSTRAP_ARGS=()
+BOOTSTRAP_ENV=(
+  DEVASTATION_OPEN_HOME=0
+  ANSIBLE_LOCAL_TEMP=/tmp/ansible-local
+  ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote
+)
+
+if [[ "$SKIP_BOOTSTRAP" != "1" ]]; then
+  if [[ -t 0 ]]; then
+    BOOTSTRAP_ARGS=(--ask-become-pass)
+  else
+    if sudo -n true 2>/dev/null; then
+      BOOTSTRAP_ENV+=(DEVASTATION_ASSUME_WARM_SUDO=1)
+    else
+      cat >&2 <<EOF
+sudo is not warm and this shell is not interactive.
+
+Run this first from a terminal:
+
+  sudo -v
+
+Then rerun:
+
+  bin/devastation-deploy-cluster-project ${PROJECT}
+EOF
+      exit 1
+    fi
+  fi
+fi
+
+if [[ "$SKIP_BUILD" != "1" ]]; then
+  echo "Building ${IMAGE}:latest from cluster/${PROJECT}..."
+  docker build -t "$IMAGE" "$CONTEXT"
+
+  echo "Pushing ${IMAGE}:latest..."
+  docker push "$IMAGE"
+fi
+
+echo "Regenerating cluster DNS/cert extension inputs..."
+"$REGISTER_HELPER"
+
+if [[ "$SKIP_BOOTSTRAP" != "1" ]]; then
+
+  echo "Converging devastation bootstrap for DNS, certs, and portal links..."
+  env "${BOOTSTRAP_ENV[@]}" ./bin/devastation-up "${BOOTSTRAP_ARGS[@]}"
+fi
+
+if [[ "$PLAN" == "1" ]]; then
+  echo "Planning cluster Terraform changes..."
+  "$TERRAFORM" -chdir="${ROOT}/cluster/terraform" init
+  "$TERRAFORM" -chdir="${ROOT}/cluster/terraform" plan -lock=false -no-color
+  exit 0
+fi
+
+echo "Applying cluster Terraform..."
+"$DEPLOY_HELPER" -auto-approve
+
+if [[ "$SKIP_VERIFY" != "1" ]]; then
+  echo "Waiting for ${PROJECT} rollout..."
+  kubectl -n "$PROJECT" rollout status "deployment/${PROJECT}" --timeout=300s
+
+  echo "Checking DNS for ${HOSTNAME}..."
+  getent hosts "$HOSTNAME"
+
+  echo "Checking HTTPS for ${HOSTNAME}..."
+  curl -kfsSI "https://${HOSTNAME}" >/dev/null
+
+  echo "Deployed https://${HOSTNAME}"
+fi
