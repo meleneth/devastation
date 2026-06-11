@@ -78,6 +78,9 @@ check "Docker running" docker info || status=1
 {% if not host_sshd_enabled %}
 check "host SSH daemon disabled" bash -c "! systemctl is-active --quiet ssh.service && ! systemctl is-active --quiet sshd.service" || status=1
 {% endif %}
+{% for key, value in host_sysctl_settings | dictsort %}
+check "sysctl {{ key }}" bash -c 'test "$(cat /proc/sys/{{ key | replace(".", "/") }})" = "{{ value }}"' || status=1
+{% endfor %}
 check "registry reachable" curl -fsS "https://${REGISTRY}/v2/" || status=1
 check "registry metrics reachable" curl -fsS "http://${REGISTRY}:{{ registry_metrics_port }}/metrics" || status=1
 check "apt cache reachable" curl -fsS "http://apt-cache.${DOMAIN}:{{ apt_cache_port }}/acng-report.html" || status=1

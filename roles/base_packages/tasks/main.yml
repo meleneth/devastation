@@ -53,6 +53,26 @@
     - not host_sshd_enabled | bool
     - item in ansible_facts.services
 
+- name: Configure host sysctl prerequisites
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/90-devastation.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by devastation bootstrap.
+      {% for key, value in host_sysctl_settings | dictsort %}
+      {{ key }} = {{ value }}
+      {% endfor %}
+
+- name: Apply host sysctl prerequisites
+  ansible.builtin.command:
+    argv:
+      - sysctl
+      - --load
+      - /etc/sysctl.d/90-devastation.conf
+  changed_when: false
+
 - name: Ensure pipx path is available for target user
   ansible.builtin.command: pipx ensurepath
   become: true

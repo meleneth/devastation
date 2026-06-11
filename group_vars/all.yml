@@ -155,6 +155,9 @@ host_sshd_enabled: false
 host_sshd_service_names:
   - ssh.service
   - sshd.service
+host_sysctl_settings:
+  fs.inotify.max_user_instances: 8192
+  fs.inotify.max_user_watches: 1048576
 base_packages_default:
   - apt-transport-https
   - bash
