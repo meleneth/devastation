@@ -1,0 +1,7 @@
+const { test, expect } = require('@playwright/test');
+
+test('devastation portal renders', async ({ page }) => {
+  await page.goto('/');
+  await expect(page).toHaveTitle(/Devastation/);
+  await expect(page.getByRole('heading', { name: 'Devastation' })).toBeVisible();
+});

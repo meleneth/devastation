@@ -33,6 +33,14 @@ devastation_subnets:
   development_db: 172.30.42.32
   production_db: 172.30.42.33
   otel_db: 172.30.42.34
+  app_gateway: 172.30.42.37
+  iam_db: 172.30.42.38
+  keystone_db: 172.30.42.39
+  mail: 172.30.42.40
+  iam: 172.30.42.41
+  keystone: 172.30.42.42
+  seaweed: 172.30.42.43
+  playwright: 172.30.42.44
 
 devastation_dns_records:
   - name: "{{ devastation_domain }}"
@@ -91,6 +99,22 @@ devastation_dns_records:
     ip: "{{ devastation_subnets.production_db }}"
   - name: "otel-db.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.otel_db }}"
+  - name: "iam-db.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.iam_db }}"
+  - name: "keystone-db.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.keystone_db }}"
+  - name: "iam.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.app_gateway }}"
+  - name: "mail.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.app_gateway }}"
+  - name: "smtp.mail.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.mail }}"
+  - name: "keystone.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.app_gateway }}"
+  - name: "s3.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.app_gateway }}"
+  - name: "seaweed.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.app_gateway }}"
 
 devastation_internal_hostnames:
   - "{{ devastation_domain }}"
@@ -121,6 +145,14 @@ devastation_internal_hostnames:
   - "development-db.{{ devastation_domain }}"
   - "production-db.{{ devastation_domain }}"
   - "otel-db.{{ devastation_domain }}"
+  - "iam-db.{{ devastation_domain }}"
+  - "keystone-db.{{ devastation_domain }}"
+  - "iam.{{ devastation_domain }}"
+  - "mail.{{ devastation_domain }}"
+  - "smtp.mail.{{ devastation_domain }}"
+  - "keystone.{{ devastation_domain }}"
+  - "s3.{{ devastation_domain }}"
+  - "seaweed.{{ devastation_domain }}"
 
 devastation_extra_dns_records: []
 devastation_extra_internal_hostnames: []
@@ -145,6 +177,7 @@ devastation_paths:
   teamcity: "{{ devastation_root }}/teamcity"
   eventline: "{{ devastation_root }}/eventline"
   storage: "{{ devastation_root }}/storage"
+  app_services: "{{ devastation_root }}/app-services"
   www: "{{ devastation_root }}/www"
   postgres: "{{ devastation_root }}/postgres"
   logs: "{{ devastation_root }}/logs"
@@ -160,6 +193,7 @@ host_sysctl_settings:
   fs.inotify.max_user_watches: 1048576
 base_packages_default:
   - apt-transport-https
+  - awscli
   - bash
   - build-essential
   - ca-certificates
@@ -191,11 +225,30 @@ base_packages_default:
 user_setup_enabled: true
 user_setup_home: "{{ lookup('ansible.builtin.env', 'HOME') }}"
 user_setup_shell_profile: "{{ user_setup_home }}/.profile"
+user_setup_zsh_startup_files:
+  - "{{ user_setup_home }}/.zprofile"
+  - "{{ user_setup_home }}/.zshrc"
 user_setup_install_latest_versions: true
 user_setup_configure_package_mirrors: true
 user_setup_npm_registry: "http://npm-cache.{{ devastation_domain }}:{{ npm_cache_port }}"
 user_setup_pip_index_url: "http://pypi-cache.{{ devastation_domain }}:{{ pypi_cache_port }}/root/pypi/+simple/"
 user_setup_gem_source: "http://gem-cache.{{ devastation_domain }}:{{ gem_cache_port }}"
+desktop_notifications_enabled: true
+desktop_notification_packages:
+  - dunst
+  - libnotify-bin
+desktop_notifications_icon: dialog-information
+dunst_font: Monospace 10
+dunst_frame_color: "#5f87af"
+dunst_low_background: "#1f2328"
+dunst_low_foreground: "#d0d7de"
+dunst_low_timeout: 4
+dunst_normal_background: "#20242b"
+dunst_normal_foreground: "#f0f3f6"
+dunst_normal_timeout: 8
+dunst_critical_background: "#3a1d24"
+dunst_critical_foreground: "#ffffff"
+dunst_critical_frame_color: "#d73a49"
 pyenv_repo: https://github.com/pyenv/pyenv.git
 pyenv_root: "{{ user_setup_home }}/.pyenv"
 rbenv_repo: https://github.com/rbenv/rbenv.git
@@ -206,6 +259,12 @@ nvm_version: v0.40.1
 nvm_root: "{{ user_setup_home }}/.nvm"
 tfenv_repo: https://github.com/tfutils/tfenv.git
 tfenv_root: "{{ user_setup_home }}/.tfenv"
+goenv_repo: https://github.com/go-nv/goenv.git
+goenv_root: "{{ user_setup_home }}/.goenv"
+rustup_init_url: https://sh.rustup.rs
+cargo_home: "{{ user_setup_home }}/.cargo"
+rustup_home: "{{ user_setup_home }}/.rustup"
+rustup_init_path: "{{ user_setup_home }}/.rustup-init"
 
 meslo_lgs_nerd_font_enabled: true
 meslo_lgs_nerd_font_base_url: https://raw.githubusercontent.com/romkatv/powerlevel10k-media/master
@@ -266,6 +325,11 @@ ca_leaf_certificates:
   - "ca.{{ devastation_domain }}"
   - "apt-cache.{{ devastation_domain }}"
   - "kind.{{ devastation_domain }}"
+  - "iam.{{ devastation_domain }}"
+  - "mail.{{ devastation_domain }}"
+  - "keystone.{{ devastation_domain }}"
+  - "s3.{{ devastation_domain }}"
+  - "seaweed.{{ devastation_domain }}"
 ca_extra_leaf_certificates: []
 cert_subject_country: US
 cert_valid_days: 825
@@ -348,6 +412,8 @@ istio_gateway_service_type: ClusterIP
 argocd_version: v3.4.2
 otel_operator_version: v0.151.0
 kind_install_platform_addons: true
+kind_sync_extra_leaf_certs_to_istio: true
+kind_istio_tls_secret_namespace: istio-system
 cert_manager_helm_repo: https://charts.jetstack.io
 istio_helm_repo: https://istio-release.storage.googleapis.com/charts
 argocd_manifest_url: "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml"
@@ -365,6 +431,7 @@ gitlab_backup_tar: ""
 gitlab_old_config_path: ""
 gitlab_old_logs_path: ""
 gitlab_old_data_path: ""
+gitlab_stop_grace_period: 10m
 
 gitlab_runner_version: "alpine-v17.1.0"
 gitlab_runner_authentication_token: ""
@@ -375,6 +442,7 @@ gitlab_runner_mount_docker_socket: false
 gitlab_runner_tags: "local,devastation,docker"
 
 postgres_version: "18.4"
+postgres_stop_grace_period: 2m
 postgres_default_user: devastation
 postgres_default_password: devastation
 postgres_databases:
@@ -398,6 +466,16 @@ postgres_databases:
     subnet_key: otel_db
     database: otel_db
     host_port: 5436
+  - service: iam-db
+    hostname: "iam-db.{{ devastation_domain }}"
+    subnet_key: iam_db
+    database: iam
+    host_port: 5437
+  - service: keystone-db
+    hostname: "keystone-db.{{ devastation_domain }}"
+    subnet_key: keystone_db
+    database: keystone
+    host_port: 5438
 
 vault_version: "1.19.5"
 vault_dev_root_token: devastation
@@ -416,6 +494,32 @@ minio_root_user: devastation
 minio_root_password: devastation
 minio_api_port: 9000
 minio_console_port: 9001
+app_gateway_image: nginx:1.27-alpine
+keycloak_upstream_image: quay.io/keycloak/keycloak:26.0
+keycloak_image: "registry.{{ devastation_domain }}/devastation-mirror/quay.io/keycloak/keycloak:26.0"
+keycloak_realm: devastation
+keycloak_admin_user: admin
+keycloak_admin_password: devastation-admin
+keycloak_dev_user: developer
+keycloak_dev_password: devastation-dev
+keycloak_demo_client_id: devastation-demo
+keycloak_demo_client_secret: devastation-demo-secret
+mailpit_image: axllent/mailpit:v1.21
+mailpit_smtp_port: 1025
+mailpit_ui_port: 8025
+mailpit_default_from: "dev@deva.station"
+playwright_upstream_image: mcr.microsoft.com/playwright:v1.49.1-noble
+playwright_image: "registry.{{ devastation_domain }}/devastation-mirror/mcr.microsoft.com/playwright:v1.49.1-noble"
+keystone_image: devastation/keystone-local:dev
+keystone_node_base_image: node:22-bookworm-slim
+keystone_admin_email: admin@deva.station
+keystone_admin_password: devastation-admin
+keystone_session_secret: devastation-keystone-session-secret-local-only
+seaweedfs_image: chrislusf/seaweedfs:3.97
+seaweedfs_region: us-east-1
+seaweedfs_access_key: devastation
+seaweedfs_secret_key: devastation-secret
+seaweedfs_default_bucket: devastation-dev
 www_image: nginx:1.27-alpine
 www_http_port: 80
 www_https_port: 443
@@ -434,10 +538,22 @@ otel_collector_image: otel/opentelemetry-collector-contrib:0.153.0
 otel_grpc_port: 4317
 otel_http_port: 4318
 otel_fluentforward_port: 8006
-jaeger_image: cr.jaegertracing.io/jaegertracing/jaeger:2.19.0
+jaeger_upstream_image: cr.jaegertracing.io/jaegertracing/jaeger:2.19.0
+jaeger_image: "registry.{{ devastation_domain }}/devastation-mirror/cr.jaegertracing.io/jaegertracing/jaeger:2.19.0"
 jaeger_ui_port: 16686
 node_exporter_image: prom/node-exporter:latest
-cadvisor_image: gcr.io/cadvisor/cadvisor:latest
+cadvisor_upstream_image: gcr.io/cadvisor/cadvisor:latest
+cadvisor_image: "registry.{{ devastation_domain }}/devastation-mirror/gcr.io/cadvisor/cadvisor:latest"
 postgres_exporter_image: prometheuscommunity/postgres-exporter:latest
+
+devastation_mirrored_images:
+  - source: "{{ keycloak_upstream_image }}"
+    target: "{{ keycloak_image }}"
+  - source: "{{ playwright_upstream_image }}"
+    target: "{{ playwright_image }}"
+  - source: "{{ jaeger_upstream_image }}"
+    target: "{{ jaeger_image }}"
+  - source: "{{ cadvisor_upstream_image }}"
+    target: "{{ cadvisor_image }}"
 
 validation_run_acceptance: false

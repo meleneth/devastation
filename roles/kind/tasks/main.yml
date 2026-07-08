@@ -346,3 +346,31 @@
       - --timeout=300s
   changed_when: false
   when: kind_install_platform_addons | bool
+
+- name: Sync extra leaf certificates into Istio Gateway namespace
+  ansible.builtin.shell: |
+    set -euo pipefail
+    host="{{ item }}"
+    secret="${host%%.*}-tls"
+
+    kubectl --kubeconfig "{{ kind_user_kubeconfig }}" create secret tls "$secret" \
+      --namespace "{{ kind_istio_tls_secret_namespace }}" \
+      --cert "{{ devastation_paths.certs }}/${host}/tls.crt" \
+      --key "{{ devastation_paths.certs }}/${host}/tls.key" \
+      --dry-run=client \
+      --output=yaml \
+    | kubectl --kubeconfig "{{ kind_user_kubeconfig }}" label \
+        --filename - \
+        --local \
+        --output=yaml \
+        app.kubernetes.io/part-of=sectorfour-mirror \
+    | kubectl --kubeconfig "{{ kind_user_kubeconfig }}" apply --filename -
+  args:
+    executable: /bin/bash
+  loop: "{{ ca_extra_leaf_certificates }}"
+  changed_when: "'configured' in istio_extra_leaf_cert_sync.stdout or 'created' in istio_extra_leaf_cert_sync.stdout"
+  register: istio_extra_leaf_cert_sync
+  when:
+    - kind_install_platform_addons | bool
+    - kind_sync_extra_leaf_certs_to_istio | bool
+    - ca_extra_leaf_certificates | length > 0

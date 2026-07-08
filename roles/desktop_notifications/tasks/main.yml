@@ -1,0 +1,59 @@
+---
+- name: Install desktop notification packages
+  ansible.builtin.apt:
+    name: "{{ desktop_notification_packages }}"
+    state: present
+    lock_timeout: "{{ apt_lock_timeout | int }}"
+  when: desktop_notifications_enabled | bool
+
+- name: Ensure dunst config directory exists
+  ansible.builtin.file:
+    path: "{{ user_setup_home }}/.config/dunst"
+    state: directory
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0755"
+  when: desktop_notifications_enabled | bool
+
+- name: Configure dunst for devastation notifications
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/dunst-dunstrc.j2"
+    dest: "{{ user_setup_home }}/.config/dunst/dunstrc"
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+  when: desktop_notifications_enabled | bool
+
+- name: Ensure desktop autostart directory exists
+  ansible.builtin.file:
+    path: "{{ user_setup_home }}/.config/autostart"
+    state: directory
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0755"
+  when: desktop_notifications_enabled | bool
+
+- name: Autostart dunst in graphical sessions
+  ansible.builtin.copy:
+    dest: "{{ user_setup_home }}/.config/autostart/dunst.desktop"
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+    content: |
+      [Desktop Entry]
+      Type=Application
+      Name=Dunst
+      Comment=Devastation notification daemon
+      Exec=dunst
+      OnlyShowIn=GNOME;KDE;XFCE;LXDE;MATE;Unity;Cinnamon;Pantheon;sway;Hyprland;
+      X-GNOME-Autostart-enabled=true
+  when: desktop_notifications_enabled | bool
+
+- name: Install devastation notification helper
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/devastation-notify.j2"
+    dest: /usr/local/bin/devastation-notify
+    owner: root
+    group: root
+    mode: "0755"
+  when: desktop_notifications_enabled | bool

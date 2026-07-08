@@ -119,6 +119,33 @@ fi
 
 cd "$ROOT"
 
+notify_devastation() {
+  local urgency="$1"
+  local title="$2"
+  local body="${3:-}"
+
+  if [[ "${DEVASTATION_NOTIFY:-1}" != "1" ]]; then
+    return 0
+  fi
+
+  if [[ -x /usr/local/bin/devastation-notify ]]; then
+    /usr/local/bin/devastation-notify "$urgency" "$title" "$body" || true
+  elif command -v notify-send >/dev/null 2>&1; then
+    notify-send --app-name="devastation" --urgency="$urgency" "$title" "$body" >/dev/null 2>&1 || true
+  fi
+}
+
+notify_devastation normal "Devastation project deploy started" "Preparing ${PROJECT}."
+
+on_deploy_exit() {
+  local rc=$?
+  if [[ "$rc" != "0" ]]; then
+    notify_devastation critical "Devastation project deploy failed" "${PROJECT} exited with status ${rc}."
+  fi
+}
+
+trap on_deploy_exit EXIT
+
 BOOTSTRAP_ARGS=()
 BOOTSTRAP_ENV=(
   DEVASTATION_OPEN_HOME=0
@@ -151,9 +178,11 @@ fi
 
 if [[ "$SKIP_BUILD" != "1" ]]; then
   echo "Building ${IMAGE}:latest from cluster/${PROJECT}..."
+  notify_devastation normal "Building project image" "${PROJECT}: docker build started."
   docker build -t "$IMAGE" "$CONTEXT"
 
   echo "Pushing ${IMAGE}:latest..."
+  notify_devastation normal "Pushing project image" "${PROJECT}: docker push started."
   docker push "$IMAGE"
 fi
 
@@ -163,21 +192,27 @@ echo "Regenerating cluster DNS/cert extension inputs..."
 if [[ "$SKIP_BOOTSTRAP" != "1" ]]; then
 
   echo "Converging devastation bootstrap for DNS, certs, and portal links..."
+  notify_devastation normal "Converging bootstrap" "${PROJECT}: DNS, certificates, and portal links."
   env "${BOOTSTRAP_ENV[@]}" ./bin/devastation-up "${BOOTSTRAP_ARGS[@]}"
 fi
 
 if [[ "$PLAN" == "1" ]]; then
   echo "Planning cluster Terraform changes..."
+  notify_devastation normal "Planning Terraform" "${PROJECT}: terraform plan started."
   "$TERRAFORM" -chdir="${ROOT}/cluster/terraform" init
   "$TERRAFORM" -chdir="${ROOT}/cluster/terraform" plan -lock=false -no-color
+  trap - EXIT
+  notify_devastation low "Terraform plan complete" "${PROJECT}: plan finished."
   exit 0
 fi
 
 echo "Applying cluster Terraform..."
+notify_devastation normal "Applying Terraform" "${PROJECT}: cluster deployment started."
 "$DEPLOY_HELPER" -auto-approve
 
 if [[ "$SKIP_VERIFY" != "1" ]]; then
   echo "Waiting for ${PROJECT} rollout..."
+  notify_devastation normal "Verifying rollout" "${PROJECT}: waiting for Kubernetes rollout."
   kubectl -n "$PROJECT" rollout status "deployment/${PROJECT}" --timeout=300s
 
   echo "Checking DNS for ${HOSTNAME}..."
@@ -188,3 +223,6 @@ if [[ "$SKIP_VERIFY" != "1" ]]; then
 
   echo "Deployed https://${HOSTNAME}"
 fi
+
+trap - EXIT
+notify_devastation low "Devastation project deploy complete" "Deployed https://${HOSTNAME}."

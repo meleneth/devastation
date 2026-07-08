@@ -39,3 +39,22 @@ gem install rake --source http://gem-cache.deva.station:9292
 ```
 
 The caches are transparent proxies. They still need upstream internet the first time a package is fetched, then serve cached artifacts from `/srv/devastation` on later runs.
+
+# Cluster App Hostnames And Certs
+
+For new `*.deva.station` apps that are exposed through the KIND/Istio edge,
+`cluster/devastation-register-main-script-inputs` is the generated handoff into
+the local DNS and certificate universe. Make sure it includes the hostname, the
+intended `172.30.42.x` address, and the `ca_extra_leaf_certificates` entry before
+running bootstrap or trust rotation.
+
+The cluster side still needs matching routing:
+
+- MetalLB `IPAddressPool` must include the chosen `172.30.42.x` address.
+- An `istio-system/APP-istio-edge` LoadBalancer Service must exist for that IP.
+- Gateway `istio-system/sectorfour-mirror` must include the host on HTTP and a
+  HTTPS server using `credentialName: APP-tls`.
+- `bin/devastation-up` syncs `ca_extra_leaf_certificates` from
+  `/srv/devastation/certs/HOSTNAME/` into Kubernetes as `APP-tls` in
+  `istio-system` after KIND/Istio convergence. Keep app-namespace copies in the
+  app Terraform/import flow when matching the existing service pattern.

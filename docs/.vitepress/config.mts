@@ -12,6 +12,7 @@ export default defineConfig({
       { text: 'GitLab', link: '/gitlab-runner' },
       { text: 'Vault', link: '/vault' },
       { text: 'Services', link: '/services' },
+      { text: 'Generated Apps', link: '/generated-app-services' },
       { text: 'TeamCity', link: '/teamcity' }
     ],
     sidebar: [
@@ -22,6 +23,7 @@ export default defineConfig({
           { text: 'GitLab And Runner', link: '/gitlab-runner' },
           { text: 'Vault', link: '/vault' },
           { text: 'SNS, SQS, And S3', link: '/services' },
+          { text: 'Generated App Services', link: '/generated-app-services' },
           { text: 'TeamCity', link: '/teamcity' }
         ]
       }

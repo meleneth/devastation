@@ -47,6 +47,7 @@
         - { path: "{{ devastation_paths.teamcity }}", mode: "0755" }
         - { path: "{{ devastation_paths.eventline }}", mode: "0755" }
         - { path: "{{ devastation_paths.storage }}", mode: "0755" }
+        - { path: "{{ devastation_paths.app_services }}", mode: "0755" }
         - { path: "{{ devastation_paths.package_caches }}", mode: "0755" }
         - { path: "{{ devastation_paths.www }}", mode: "0755" }
         - { path: "{{ devastation_paths.postgres }}", mode: "0755" }
@@ -82,6 +83,13 @@
       ansible.builtin.import_role:
         name: user_setup
       when: user_setup_enabled
+
+    - name: Apply desktop notifications role
+      ansible.builtin.import_role:
+        name: desktop_notifications
+      when: desktop_notifications_enabled
+      tags:
+        - desktop_notifications
 
     - name: Apply fonts role
       ansible.builtin.import_role:
@@ -133,6 +141,12 @@
     - name: Apply storage role
       ansible.builtin.import_role:
         name: storage
+
+    - name: Apply generated app services role
+      ansible.builtin.import_role:
+        name: app_services
+      tags:
+        - app_services
 
     - name: Apply web portal role
       ansible.builtin.import_role:

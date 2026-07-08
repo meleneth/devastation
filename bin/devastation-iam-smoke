@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+domain="${DEVASTATION_DOMAIN:-deva.station}"
+realm="${KEYCLOAK_REALM:-devastation}"
+client_id="${KEYCLOAK_CLIENT_ID:-devastation-demo}"
+client_secret="${KEYCLOAK_CLIENT_SECRET:-devastation-demo-secret}"
+username="${KEYCLOAK_USERNAME:-developer}"
+password="${KEYCLOAK_PASSWORD:-devastation-dev}"
+issuer="https://iam.${domain}/realms/${realm}"
+
+well_known="$(curl -fsS "${issuer}/.well-known/openid-configuration")"
+echo "$well_known" | jq -e '.issuer and .authorization_endpoint and .token_endpoint and .jwks_uri and .userinfo_endpoint' >/dev/null
+
+token="$(curl -fsS \
+  -d "grant_type=password" \
+  -d "client_id=${client_id}" \
+  -d "client_secret=${client_secret}" \
+  -d "username=${username}" \
+  -d "password=${password}" \
+  "${issuer}/protocol/openid-connect/token" | jq -r '.access_token')"
+
+test -n "$token"
+test "$token" != "null"
+
+curl -fsS -H "Authorization: Bearer ${token}" "${issuer}/protocol/openid-connect/userinfo" | jq -e '.preferred_username == "'"${username}"'"' >/dev/null
+
+printf '[ok] IAM OIDC discovery, token, and userinfo succeeded for %s\n' "$issuer"

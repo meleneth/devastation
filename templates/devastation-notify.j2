@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+urgency="${1:-normal}"
+title="${2:-Devastation}"
+body="${3:-}"
+
+case "$urgency" in
+  low|normal|critical)
+    ;;
+  *)
+    urgency="normal"
+    ;;
+esac
+
+if [[ "${DEVASTATION_NOTIFY:-1}" != "1" ]]; then
+  exit 0
+fi
+
+can_notify=0
+if command -v notify-send >/dev/null 2>&1; then
+  if [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" || -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+    can_notify=1
+  fi
+fi
+
+if [[ "$can_notify" == "1" ]]; then
+  notify-send \
+    --app-name="devastation" \
+    --urgency="$urgency" \
+    --icon="{{ desktop_notifications_icon }}" \
+    "$title" \
+    "$body" >/dev/null 2>&1 || true
+else
+  printf '[%s] %s' "$urgency" "$title"
+  if [[ -n "$body" ]]; then
+    printf ': %s' "$body"
+  fi
+  printf '\n'
+fi

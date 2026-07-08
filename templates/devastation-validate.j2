@@ -84,6 +84,7 @@ check "sysctl {{ key }}" bash -c 'test "$(cat /proc/sys/{{ key | replace(".", "/
 check "registry reachable" curl -fsS "https://${REGISTRY}/v2/" || status=1
 check "registry metrics reachable" curl -fsS "http://${REGISTRY}:{{ registry_metrics_port }}/metrics" || status=1
 check "apt cache reachable" curl -fsS "http://apt-cache.${DOMAIN}:{{ apt_cache_port }}/acng-report.html" || status=1
+check "host apt uses local HTTP proxy" bash -c "grep -Fq 'Acquire::http::Proxy \"http://apt-cache.${DOMAIN}:{{ apt_cache_port }}\"' /etc/apt/apt.conf.d/01devastation-proxy" || status=1
 check "npm cache reachable" curl -fsS "http://npm-cache.${DOMAIN}:{{ npm_cache_port }}/-/ping" || status=1
 check "PyPI cache reachable" curl -fsSL "http://pypi-cache.${DOMAIN}:{{ pypi_cache_port }}/root/pypi/+simple/" || status=1
 check "RubyGems cache reachable" curl -fsS "http://gem-cache.${DOMAIN}:{{ gem_cache_port }}/" || status=1
@@ -91,6 +92,12 @@ check "Vault reachable" curl -fsS "http://vault.${DOMAIN}:{{ vault_port }}/v1/sy
 retry_check "TeamCity reachable" 48 5 curl -sS -o /dev/null "http://teamcity.${DOMAIN}:{{ teamcity_port }}/" || status=1
 check "eventline GoAWS reachable" nc -z "eventline.${DOMAIN}" {{ goaws_port }} || status=1
 check "storage MinIO reachable" curl -fsS "http://storage.${DOMAIN}:{{ minio_api_port }}/minio/health/live" || status=1
+retry_check "IAM reachable" 24 5 curl -fsS "https://iam.${DOMAIN}/realms/{{ keycloak_realm }}/.well-known/openid-configuration" || status=1
+check "Mailpit UI reachable" curl -fsS "https://mail.${DOMAIN}/api/v1/info" || status=1
+check "Mailpit SMTP reachable" nc -z "smtp.mail.${DOMAIN}" {{ mailpit_smtp_port }} || status=1
+retry_check "Keystone reachable" 24 5 curl -fsS "https://keystone.${DOMAIN}/" || status=1
+retry_check "SeaweedFS S3 reachable" 24 5 nc -z "s3.${DOMAIN}" 443 || status=1
+check "SeaweedFS filer reachable" curl -fsS "https://seaweed.${DOMAIN}/" || status=1
 check "apex portal reachable" curl -fsS "https://${DOMAIN}/" || status=1
 check "www portal reachable" curl -fsS "https://www.${DOMAIN}/" || status=1
 check "www portal redirects HTTP to HTTPS" bash -c "curl -fsSI 'http://www.${DOMAIN}:{{ www_http_port }}/' | grep -qi '^location: https://www\\.${DOMAIN}/'" || status=1
@@ -110,6 +117,12 @@ check "Helm installed" helm version --short || status=1
 check "k9s installed" k9s version || status=1
 check "lazydocker installed" lazydocker --version || status=1
 check "trivy installed" trivy --version || status=1
+{% if desktop_notifications_enabled %}
+check "dunst installed" dunst --version || status=1
+check "notify-send installed" notify-send --version || status=1
+check "devastation notification helper installed" test -x /usr/local/bin/devastation-notify || status=1
+check "dunst config installed" test -f "{{ user_setup_home }}/.config/dunst/dunstrc" || status=1
+{% endif %}
 {% if blender_install_enabled %}
 {% if blender_remove_distro_package %}
 check "distro Blender package absent" bash -c '! dpkg-query -W -f="${Status}" blender 2>/dev/null | grep -q "install ok installed"' || status=1
@@ -141,6 +154,7 @@ DOCKERFILE
   check "build local registry test image" docker build -t "$image" "$tmp" || status=1
   check "push local registry test image" docker push "$image" || status=1
   check "pull local registry test image" docker pull "$image" || status=1
+  check "Docker Hub pull-through cache reachable" curl -fsS "http://registry-cache.${DOMAIN}:5000/v2/" || status=1
   kubectl delete namespace devastation-validate --ignore-not-found >/dev/null 2>&1 || true
   check "create validation namespace" kubectl create namespace devastation-validate || status=1
   check "run registry image in KIND" kubectl -n devastation-validate run hello --image="$image" --restart=Never || status=1

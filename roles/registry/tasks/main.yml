@@ -51,3 +51,39 @@
     owner: root
     group: root
     mode: "0644"
+
+- name: Wait for private registry API
+  ansible.builtin.uri:
+    url: "https://registry.{{ devastation_domain }}/v2/"
+    status_code: 200
+  register: registry_api_wait
+  retries: 24
+  delay: 5
+  until: registry_api_wait.status == 200
+
+- name: Write mirrored image manifest
+  ansible.builtin.copy:
+    dest: "{{ devastation_paths.compose }}/mirrored-images.tsv"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # upstream	target
+      {% for image in devastation_mirrored_images %}
+      {{ image.source }}	{{ image.target }}
+      {% endfor %}
+
+- name: Install image mirror update script
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../bin/devastation-mirror-images"
+    dest: /usr/local/bin/devastation-mirror-images
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Mirror non-Docker-Hub images into the private registry
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/devastation-mirror-images
+  changed_when: "'[push]' in image_mirror_result.stdout"
+  register: image_mirror_result

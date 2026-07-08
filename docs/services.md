@@ -1,4 +1,4 @@
-# SNS, SQS, And S3
+# SNS, SQS, S3, And Generated App Services
 
 `devastation` includes local AWS-shaped services for queues, topics, and object storage.
 
@@ -32,7 +32,7 @@ The persistent service data lives under:
 /srv/devastation/eventline
 ```
 
-## S3
+## Legacy MinIO S3
 
 MinIO runs the S3-compatible API at:
 
@@ -67,6 +67,37 @@ Persistent object data lives under:
 /srv/devastation/storage/data
 ```
 
+## SeaweedFS S3
+
+Generated and local applications should prefer the SeaweedFS S3 endpoint:
+
+```bash
+https://s3.deva.station
+```
+
+Default settings:
+
+- endpoint: `https://s3.deva.station`
+- region: `us-east-1`
+- access key: `devastation`
+- secret key: `devastation-secret`
+- bucket: `devastation-dev`
+- force path style: `true`
+
+The filer UI is:
+
+```bash
+https://seaweed.deva.station
+```
+
+Smoke:
+
+```bash
+bin/devastation-s3-smoke
+```
+
+See [Generated App Services](./generated-app-services.md) for Rails Active Storage and generic AWS SDK examples.
+
 ## Databases
 
 Postgres services are available at:
@@ -84,3 +115,9 @@ Host ports are also exposed:
 - development: `5434`
 - production: `5435`
 - otel: `5436`
+- iam: `5437`
+- keystone: `5438`
+
+## Generated App Services
+
+Shared IAM, Mailpit, Playwright, Keystone, and SeaweedFS are documented in [Generated App Services](./generated-app-services.md).

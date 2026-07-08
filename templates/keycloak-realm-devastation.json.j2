@@ -1,0 +1,100 @@
+{
+  "realm": "{{ keycloak_realm }}",
+  "enabled": true,
+  "displayName": "Devastation Local",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "attributes": {
+    "frontendUrl": "https://iam.{{ devastation_domain }}"
+  },
+  "users": [
+    {
+      "username": "{{ keycloak_dev_user }}",
+      "email": "developer@{{ devastation_domain }}",
+      "firstName": "Dev",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["developer"],
+      "attributes": {
+        "picture": ["https://www.{{ devastation_domain }}/avatar/developer.png"],
+        "avatar_url": ["https://www.{{ devastation_domain }}/avatar/developer.png"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "{{ keycloak_dev_password }}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "{{ keycloak_admin_user }}",
+      "email": "admin@{{ devastation_domain }}",
+      "firstName": "Admin",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["admin"],
+      "attributes": {
+        "picture": ["https://www.{{ devastation_domain }}/avatar/admin.png"],
+        "avatar_url": ["https://www.{{ devastation_domain }}/avatar/admin.png"]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "{{ keycloak_admin_password }}",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Local development administrator."
+      },
+      {
+        "name": "developer",
+        "description": "Local development user."
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "{{ keycloak_demo_client_id }}",
+      "name": "Devastation Demo Application",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "{{ keycloak_demo_client_secret }}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "https://datawires.{{ devastation_domain }}/auth/keycloak/callback",
+        "https://datawires.{{ devastation_domain }}/*",
+        "https://*.{{ devastation_domain }}/*",
+        "http://localhost:*/*",
+        "http://127.0.0.1:*/*"
+      ],
+      "webOrigins": [
+        "https://datawires.{{ devastation_domain }}",
+        "https://*.{{ devastation_domain }}",
+        "http://localhost:*",
+        "http://127.0.0.1:*"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://datawires.{{ devastation_domain }}/*##https://*.{{ devastation_domain }}/*##http://localhost:*/*##http://127.0.0.1:*/*",
+        "oauth2.device.authorization.grant.enabled": "true"
+      },
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    }
+  ]
+}

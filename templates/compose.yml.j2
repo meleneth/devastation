@@ -166,6 +166,133 @@ services:
       devastation:
         ipv4_address: {{ devastation_subnets.storage }}
 
+  app-gateway:
+    image: {{ app_gateway_image }}
+    restart: unless-stopped
+    depends_on:
+      - iam
+      - mail
+      - keystone
+      - seaweed
+    volumes:
+      - {{ devastation_paths.app_services }}/gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - {{ devastation_paths.certs }}:/etc/nginx/certs:ro
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.app_gateway }}
+
+  mail:
+    image: {{ mailpit_image }}
+    restart: unless-stopped
+    environment:
+      MP_SMTP_BIND_ADDR: 0.0.0.0:{{ mailpit_smtp_port }}
+      MP_UI_BIND_ADDR: 0.0.0.0:{{ mailpit_ui_port }}
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.mail }}
+
+  iam:
+    image: {{ keycloak_image }}
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: {{ keycloak_admin_user }}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: {{ keycloak_admin_password }}
+      KC_DB: postgres
+      KC_DB_URL_HOST: iam-db
+      KC_DB_URL_DATABASE: iam
+      KC_DB_USERNAME: {{ postgres_default_user }}
+      KC_DB_PASSWORD: {{ postgres_default_password }}
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME: https://iam.{{ devastation_domain }}
+      KC_HEALTH_ENABLED: "true"
+    depends_on:
+      - iam-db
+    volumes:
+      - {{ devastation_paths.app_services }}/iam/realm-devastation.json:/opt/keycloak/data/import/realm-devastation.json:ro
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.iam }}
+
+  keystone:
+    image: {{ keystone_image }}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://{{ postgres_default_user }}:{{ postgres_default_password }}@keystone-db:5432/keystone
+      KEYSTONE_ADMIN_EMAIL: {{ keystone_admin_email }}
+      KEYSTONE_ADMIN_PASSWORD: {{ keystone_admin_password }}
+      KEYSTONE_SESSION_SECRET: {{ keystone_session_secret }}
+      KEYSTONE_COOKIE_DOMAIN: {{ devastation_domain }}
+      KEYSTONE_PUBLIC_URL: https://keystone.{{ devastation_domain }}
+      NODE_ENV: production
+    depends_on:
+      - keystone-db
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.keystone }}
+
+  seaweed:
+    image: {{ seaweedfs_image }}
+    restart: unless-stopped
+    command:
+      - server
+      - -ip=seaweed
+      - -master
+      - -master.port=9333
+      - -volume
+      - -volume.port=8080
+      - -filer
+      - -filer.port=8888
+      - -s3
+      - -s3.port=8333
+      - -s3.config=/etc/seaweedfs/s3.json
+      - -dir=/data
+    volumes:
+      - {{ devastation_paths.app_services }}/seaweed/data:/data
+      - {{ devastation_paths.app_services }}/seaweed/s3.json:/etc/seaweedfs/s3.json:ro
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.seaweed }}
+
+  seaweed-init:
+    image: amazon/aws-cli:2.22.35
+    restart: "no"
+    depends_on:
+      - seaweed
+    environment:
+      AWS_ACCESS_KEY_ID: {{ seaweedfs_access_key }}
+      AWS_SECRET_ACCESS_KEY: {{ seaweedfs_secret_key }}
+      AWS_DEFAULT_REGION: {{ seaweedfs_region }}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        for i in $$(seq 1 60); do
+          aws --endpoint-url http://seaweed:8333 s3api list-buckets >/dev/null 2>&1 && break
+          sleep 2
+        done
+        aws --endpoint-url http://seaweed:8333 s3api head-bucket --bucket {{ seaweedfs_default_bucket }} >/dev/null 2>&1 || \
+          aws --endpoint-url http://seaweed:8333 s3api create-bucket --bucket {{ seaweedfs_default_bucket }}
+    networks:
+      - devastation
+
+  playwright:
+    image: {{ playwright_image }}
+    restart: unless-stopped
+    working_dir: /work
+    command: ["tail", "-f", "/dev/null"]
+    environment:
+      HOME: /ms-playwright
+      PLAYWRIGHT_BASE_URL: https://deva.station
+      NODE_EXTRA_CA_CERTS: /usr/local/share/ca-certificates/devastation-root-ca.crt
+    volumes:
+      - {{ devastation_paths.ca }}/root-ca.crt:/usr/local/share/ca-certificates/devastation-root-ca.crt:ro
+      - {{ devastation_paths.app_services }}/playwright:/work
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.playwright }}
+
   www:
     image: {{ www_image }}
     restart: unless-stopped
@@ -188,6 +315,7 @@ services:
   {{ pg.service }}:
     image: postgres:{{ postgres_version }}
     restart: unless-stopped
+    stop_grace_period: {{ postgres_stop_grace_period }}
     environment:
       POSTGRES_USER: {{ postgres_default_user }}
       POSTGRES_PASSWORD: {{ postgres_default_password }}
@@ -328,6 +456,7 @@ services:
   gitlab:
     image: gitlab/gitlab-ce:{{ gitlab_version }}
     restart: unless-stopped
+    stop_grace_period: {{ gitlab_stop_grace_period }}
     hostname: gitlab.{{ devastation_domain }}
     shm_size: "256m"
     environment:

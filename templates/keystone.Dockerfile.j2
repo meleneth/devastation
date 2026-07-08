@@ -1,0 +1,22 @@
+ARG KEYSTONE_NODE_BASE_IMAGE={{ keystone_node_base_image }}
+FROM ${KEYSTONE_NODE_BASE_IMAGE}
+
+ARG APT_PROXY=http://apt-cache.{{ devastation_domain }}:{{ apt_cache_port }}
+ARG NPM_REGISTRY={{ user_setup_npm_registry }}
+ENV NEXT_TELEMETRY_DISABLED=1
+WORKDIR /app
+
+RUN printf 'Acquire::http::Proxy "%s";\nAcquire::https::Proxy "DIRECT";\n' "${APT_PROXY}" \
+      > /etc/apt/apt.conf.d/01devastation-proxy \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package.json
+RUN npm config set registry "${NPM_REGISTRY}" && npm install
+
+COPY keystone.ts keystone.ts
+RUN npx keystone build
+
+EXPOSE 3000
+CMD ["npm", "run", "start"]

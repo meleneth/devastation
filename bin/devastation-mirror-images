@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+manifest="${DEVASTATION_IMAGE_MIRROR_MANIFEST:-/srv/devastation/compose/mirrored-images.tsv}"
+force="${DEVASTATION_MIRROR_FORCE:-0}"
+
+if [[ ! -f "$manifest" ]]; then
+  printf 'mirror manifest not found: %s\n' "$manifest" >&2
+  printf 'Run ./bin/devastation-up to generate it, or set DEVASTATION_IMAGE_MIRROR_MANIFEST.\n' >&2
+  exit 1
+fi
+
+while IFS=$'\t' read -r source target; do
+  [[ -z "${source:-}" || "${source:0:1}" == "#" ]] && continue
+
+  if [[ "$force" != "1" ]] && docker manifest inspect "$target" >/dev/null 2>&1; then
+    printf '[skip] %s already mirrored as %s\n' "$source" "$target"
+    continue
+  fi
+
+  printf '[pull] %s\n' "$source"
+  docker pull "$source"
+  printf '[tag] %s -> %s\n' "$source" "$target"
+  docker tag "$source" "$target"
+  printf '[push] %s\n' "$target"
+  docker push "$target"
+done < "$manifest"

@@ -1,0 +1,117 @@
+---
+- name: Create generated app service directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('0755') }}"
+  loop:
+    - { path: "{{ devastation_paths.app_services }}" }
+    - { path: "{{ devastation_paths.app_services }}/gateway" }
+    - { path: "{{ devastation_paths.app_services }}/iam" }
+    - { path: "{{ devastation_paths.app_services }}/keystone" }
+    - { path: "{{ devastation_paths.app_services }}/keystone/build" }
+    - { path: "{{ devastation_paths.app_services }}/seaweed" }
+    - { path: "{{ devastation_paths.app_services }}/seaweed/data" }
+    - { path: "{{ devastation_paths.app_services }}/playwright" }
+    - { path: "{{ devastation_paths.app_services }}/playwright/tests" }
+
+- name: Write app gateway nginx configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/app-gateway-nginx.conf.j2"
+    dest: "{{ devastation_paths.app_services }}/gateway/nginx.conf"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write Keycloak realm import
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/keycloak-realm-devastation.json.j2"
+    dest: "{{ devastation_paths.app_services }}/iam/realm-devastation.json"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write SeaweedFS S3 identity config
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/seaweedfs-s3.json.j2"
+    dest: "{{ devastation_paths.app_services }}/seaweed/s3.json"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write Keystone image files
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/{{ item.src }}"
+    dest: "{{ devastation_paths.app_services }}/keystone/build/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('0644') }}"
+  loop:
+    - { src: keystone.Dockerfile.j2, dest: Dockerfile }
+    - { src: keystone-package.json.j2, dest: package.json }
+    - { src: keystone-config.ts.j2, dest: keystone.ts }
+
+- name: Build local Keystone image
+  community.docker.docker_image:
+    name: "{{ keystone_image }}"
+    source: build
+    force_source: true
+    build:
+      path: "{{ devastation_paths.app_services }}/keystone/build"
+      network: "{{ package_cache_build_network }}"
+      args:
+        KEYSTONE_NODE_BASE_IMAGE: "{{ keystone_node_base_image }}"
+        NPM_REGISTRY: "{{ user_setup_npm_registry }}"
+
+- name: Write Playwright smoke project files
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/{{ item.src }}"
+    dest: "{{ devastation_paths.app_services }}/playwright/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode | default('0644') }}"
+  loop:
+    - { src: playwright-package.json.j2, dest: package.json }
+    - { src: playwright-config.js.j2, dest: playwright.config.js }
+    - { src: playwright-smoke.spec.js.j2, dest: tests/devastation-smoke.spec.js }
+
+- name: Start generated app support services
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - iam
+      - mail
+      - keystone
+      - seaweed
+      - seaweed-init
+      - playwright
+      - app-gateway
+    state: present
+
+- name: Wait for generated app support ports
+  ansible.builtin.wait_for:
+    host: "{{ item.host }}"
+    port: "{{ item.port }}"
+    timeout: 180
+  loop:
+    - { host: "iam.{{ devastation_domain }}", port: 443 }
+    - { host: "mail.{{ devastation_domain }}", port: 443 }
+    - { host: "smtp.mail.{{ devastation_domain }}", port: "{{ mailpit_smtp_port }}" }
+    - { host: "keystone.{{ devastation_domain }}", port: 443 }
+    - { host: "s3.{{ devastation_domain }}", port: 443 }
+    - { host: "seaweed.{{ devastation_domain }}", port: 443 }
+
+- name: Install generated app support smoke scripts
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../bin/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - devastation-iam-smoke
+    - devastation-mail-smoke
+    - devastation-s3-smoke
+    - devastation-playwright-smoke

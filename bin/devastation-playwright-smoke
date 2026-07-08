@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+compose_file="${DEVASTATION_COMPOSE_FILE:-/srv/devastation/compose/compose.yml}"
+
+docker compose -f "$compose_file" exec -T playwright npx playwright test
+
+printf '[ok] Playwright Chromium smoke test passed\n'

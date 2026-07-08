@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+domain="${DEVASTATION_DOMAIN:-deva.station}"
+smtp_host="${SMTP_HOST:-smtp.mail.${domain}}"
+smtp_port="${SMTP_PORT:-1025}"
+mail_ui="https://mail.${domain}"
+recipient="${MAILPIT_SMOKE_TO:-developer@${domain}}"
+sender="${MAILPIT_SMOKE_FROM:-dev@${domain}}"
+subject="devastation mail smoke $(date +%s)"
+query="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$subject")"
+
+python3 - "$smtp_host" "$smtp_port" "$sender" "$recipient" "$subject" <<'PY'
+import smtplib
+import sys
+from email.message import EmailMessage
+
+host, port, sender, recipient, subject = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4], sys.argv[5]
+msg = EmailMessage()
+msg["From"] = sender
+msg["To"] = recipient
+msg["Subject"] = subject
+msg.set_content("devastation local Mailpit smoke test")
+
+with smtplib.SMTP(host, port, timeout=15) as smtp:
+    smtp.send_message(msg)
+PY
+
+for _ in $(seq 1 20); do
+  if curl -fsS "${mail_ui}/api/v1/search?query=${query}" | jq -e '.messages | length > 0' >/dev/null; then
+    printf '[ok] Mailpit received smoke message through %s:%s\n' "$smtp_host" "$smtp_port"
+    exit 0
+  fi
+  sleep 1
+done
+
+printf '[fail] Mailpit did not expose the smoke message in time: %s\n' "$subject" >&2
+exit 1

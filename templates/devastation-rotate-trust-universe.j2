@@ -89,6 +89,25 @@ run_as_devastation_user() {
   fi
 }
 
+write_root_openssl_config() {
+  local config="$1"
+  {
+    printf '%s\n' '[req]'
+    printf '%s\n' 'distinguished_name = req_distinguished_name'
+    printf '%s\n' 'x509_extensions = v3_ca'
+    printf '%s\n' 'prompt = no'
+    printf '\n%s\n' '[req_distinguished_name]'
+    printf 'C = %s\n' "$CERT_COUNTRY"
+    printf '%s\n' 'O = devastation'
+    printf 'CN = %s\n' "$CA_NAME"
+    printf '\n%s\n' '[v3_ca]'
+    printf '%s\n' 'subjectKeyIdentifier = hash'
+    printf '%s\n' 'authorityKeyIdentifier = keyid:always,issuer'
+    printf '%s\n' 'basicConstraints = critical, CA:true'
+    printf '%s\n' 'keyUsage = critical, keyCertSign, cRLSign'
+  } > "$config"
+}
+
 write_leaf_openssl_config() {
   local name="$1"
   local config="$2"
@@ -102,6 +121,9 @@ write_leaf_openssl_config() {
     printf '%s\n' 'O = devastation'
     printf 'CN = %s\n' "$name"
     printf '\n%s\n' '[req_ext]'
+    printf '%s\n' 'basicConstraints = critical, CA:false'
+    printf '%s\n' 'keyUsage = critical, digitalSignature, keyEncipherment'
+    printf '%s\n' 'extendedKeyUsage = serverAuth'
     printf '%s\n' 'subjectAltName = @alt_names'
     printf '\n%s\n' '[alt_names]'
     local i=1
@@ -122,6 +144,25 @@ verify_keypair_matches() {
   [[ "$cert_pub" == "$key_pub" ]]
 }
 
+verify_root_ca_extensions() {
+  local cert="$1"
+  local cert_text
+  cert_text="$(openssl x509 -in "$cert" -noout -text)"
+  grep -q "CA:TRUE" <<<"$cert_text"
+  grep -q "Certificate Sign" <<<"$cert_text"
+  grep -q "CRL Sign" <<<"$cert_text"
+}
+
+verify_leaf_extensions() {
+  local cert="$1"
+  local cert_text
+  cert_text="$(openssl x509 -in "$cert" -noout -text)"
+  grep -q "CA:FALSE" <<<"$cert_text"
+  grep -q "Digital Signature" <<<"$cert_text"
+  grep -q "Key Encipherment" <<<"$cert_text"
+  grep -q "TLS Web Server Authentication" <<<"$cert_text"
+}
+
 verify_leaf_sans() {
   local cert="$1"
   local host
@@ -137,6 +178,7 @@ generate_trust_universe() {
   chmod 0700 "$STAGING_ROOT"
   CA_PRIVATE_KEY="${STAGING_ROOT}/root-ca.key"
   local staged_ca_crt="${STAGING_ROOT}/root-ca.crt"
+  local staged_ca_config="${STAGING_ROOT}/root-ca.cnf"
   local staged_certs="${STAGING_ROOT}/certs"
   mkdir -p "$staged_certs"
 
@@ -145,13 +187,17 @@ generate_trust_universe() {
   chmod 0600 "$CA_PRIVATE_KEY"
 
   log "generating root CA certificate"
+  write_root_openssl_config "$staged_ca_config"
   openssl req -x509 -new -nodes \
     -key "$CA_PRIVATE_KEY" \
     -sha256 \
     -days 3650 \
     -subj "/C=${CERT_COUNTRY}/O=devastation/CN=${CA_NAME}" \
+    -config "$staged_ca_config" \
+    -extensions v3_ca \
     -out "$staged_ca_crt"
   chmod 0644 "$staged_ca_crt"
+  verify_root_ca_extensions "$staged_ca_crt"
 
   local name cert_dir config csr key crt
   for name in "${LEAF_CERTS[@]}"; do
@@ -181,6 +227,7 @@ generate_trust_universe() {
 
     openssl verify -CAfile "$staged_ca_crt" "$crt" >/dev/null
     verify_keypair_matches "$crt" "$key"
+    verify_leaf_extensions "$crt"
     verify_leaf_sans "$crt"
     rm -f "$csr" "$config"
   done
@@ -283,9 +330,11 @@ restart_affected_services() {
 
 verify_installed_universe() {
   local name
+  verify_root_ca_extensions "${CA_DIR}/root-ca.crt"
   for name in "${LEAF_CERTS[@]}"; do
     openssl verify -CAfile "${CA_DIR}/root-ca.crt" "${CERTS_DIR}/${name}/tls.crt" >/dev/null
     verify_keypair_matches "${CERTS_DIR}/${name}/tls.crt" "${CERTS_DIR}/${name}/tls.key"
+    verify_leaf_extensions "${CERTS_DIR}/${name}/tls.crt"
     verify_leaf_sans "${CERTS_DIR}/${name}/tls.crt"
   done
   if [[ -e "${CA_DIR}/root-ca.key" ]]; then

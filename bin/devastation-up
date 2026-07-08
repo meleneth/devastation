@@ -3,6 +3,22 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+notify_devastation() {
+  local urgency="$1"
+  local title="$2"
+  local body="${3:-}"
+
+  if [[ "${DEVASTATION_NOTIFY:-1}" != "1" ]]; then
+    return 0
+  fi
+
+  if [[ -x /usr/local/bin/devastation-notify ]]; then
+    /usr/local/bin/devastation-notify "$urgency" "$title" "$body" || true
+  elif command -v notify-send >/dev/null 2>&1; then
+    notify-send --app-name="devastation" --urgency="$urgency" "$title" "$body" >/dev/null 2>&1 || true
+  fi
+}
+
 if ! ansible-galaxy collection list community.docker >/dev/null 2>&1; then
   ansible-galaxy collection install -r requirements.yml
 fi
@@ -40,7 +56,15 @@ if [[ "${DEVASTATION_DEBUG_UP:-0}" == "1" ]]; then
   printf '\n' >&2
 fi
 
-ansible-playbook playbooks/bootstrap.yml "${args[@]}"
+notify_devastation normal "Devastation rebuild started" "Installing packages and converging local services."
+
+if ansible-playbook playbooks/bootstrap.yml "${args[@]}"; then
+  notify_devastation low "Devastation rebuild complete" "Packages, configuration, and services converged."
+else
+  rc=$?
+  notify_devastation critical "Devastation rebuild failed" "ansible-playbook exited with status ${rc}."
+  exit "$rc"
+fi
 
 home_url="${DEVASTATION_HOME_URL:-https://deva.station}"
 open_home="${DEVASTATION_OPEN_HOME:-1}"

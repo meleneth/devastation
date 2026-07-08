@@ -1,6 +1,6 @@
 # devastation
 
-`devastation` builds an idempotent local-first development environment for a Debian or Ubuntu laptop. It uses Ansible, Docker Compose, CoreDNS, an ephemeral local root CA workflow, a standalone Docker registry, pull-through caches for Docker Hub, apt, npm, PyPI, and RubyGems, KIND, GitLab CE, GitLab Runner, Neovim, Vault, Eventline GoAWS, MinIO, Postgres, and a prewired observability stack with Prometheus, Grafana, Loki, Jaeger, OpenTelemetry Collector, node-exporter, and cAdvisor.
+`devastation` builds an idempotent local-first development environment for a Debian or Ubuntu laptop. It uses Ansible, Docker Compose, CoreDNS, an ephemeral local root CA workflow, a standalone Docker registry, pull-through caches for Docker Hub, apt, npm, PyPI, and RubyGems, explicit internal mirrors for non-Docker-Hub images, KIND, GitLab CE, GitLab Runner, Neovim, Vault, Eventline GoAWS, MinIO, SeaweedFS, Mailpit, Keycloak, Keystone, Playwright, Postgres, and a prewired observability stack with Prometheus, Grafana, Loki, Jaeger, OpenTelemetry Collector, node-exporter, and cAdvisor.
 
 The internal DNS root is `deva.station`.
 
@@ -24,6 +24,7 @@ Persistent state defaults to `/srv/devastation`:
 - `/srv/devastation/teamcity`: TeamCity server data and logs
 - `/srv/devastation/eventline`: Eventline GoAWS configuration/data
 - `/srv/devastation/storage`: MinIO object data
+- `/srv/devastation/app-services`: app gateway, Keycloak realm import, Keystone source, SeaweedFS, and Playwright smoke files
 - `/srv/devastation/www`: static `deva.station` / `www.deva.station` portal files and nginx config
 - `/srv/devastation/postgres`: Postgres database data
 
@@ -34,11 +35,12 @@ The current feature set includes:
 - Private `deva.station` DNS and `/etc/hosts` records for every core service, plus an HTTPS portal at `deva.station` and `www.deva.station`
 - Ephemeral local root CA issuance with host, browser NSS, Docker, KIND, and GitLab Runner trust installation
 - Local HTTPS Docker registry plus Docker Hub pull-through cache
+- Explicit image mirroring into the private registry for required images hosted outside Docker Hub
 - Package caching for apt, npm, PyPI, and RubyGems
 - KIND with local registry trust, cert-manager, Istio, Argo CD, and the OpenTelemetry Operator
-- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, latest official Blender, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, and MesloLGS Nerd Font
+- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, latest official Blender, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, goenv, rustup, and MesloLGS Nerd Font
 - GitLab CE and a Docker-executor GitLab Runner
-- Vault dev server, Eventline GoAWS SNS/SQS emulator, MinIO object storage, and four Postgres containers
+- Vault dev server, Eventline GoAWS SNS/SQS emulator, MinIO object storage, SeaweedFS S3 object storage, Mailpit, Keycloak, Keystone, Playwright, and Postgres containers
 - Prometheus, Grafana, Loki, Jaeger v2, OpenTelemetry Collector, node-exporter, cAdvisor, registry metrics, and Postgres exporters
 
 ## Quick Start
@@ -85,8 +87,10 @@ The `user_setup` role installs language version managers for the target user:
 - `ruby-build` as an rbenv plugin
 - `nvm` in `~/.nvm`
 - `tfenv` in `~/.tfenv`
+- `goenv` in `~/.goenv`
+- `rustup` with Cargo in `~/.cargo` and toolchains in `~/.rustup`
 
-Initialization blocks are added to the configured profile, defaulting to `~/.profile`. By default, `user_setup_install_latest_versions: true` also installs and selects the latest non-beta Python, Ruby, and Terraform versions plus the latest Node.js LTS available through those managers. Set it to `false` to install only the managers. With `user_setup_configure_package_mirrors: true`, the role also configures npm, pip, RubyGems, and Bundler to use the local package caches.
+Initialization blocks are added to the configured profile, defaulting to `~/.profile`. For zsh users, the role also sources that profile from `~/.zprofile` and `~/.zshrc` by default. By default, `user_setup_install_latest_versions: true` also installs and selects the latest non-beta Python, Ruby, Go, and Terraform versions, the latest Node.js LTS, and the stable Rust toolchain available through those managers. Set it to `false` to install only the managers. With `user_setup_configure_package_mirrors: true`, the role also configures npm, pip, RubyGems, and Bundler to use the local package caches.
 
 The `fonts` role installs the patched MesloLGS Nerd Font files from `romkatv/powerlevel10k-media` system-wide under `/usr/local/share/fonts/devastation/MesloLGS` and refreshes the font cache.
 
@@ -95,6 +99,8 @@ The `neovim` role installs the latest official upstream Linux x86_64 Neovim rele
 The `dev_tools` role installs Ghostty when `ghostty_install_enabled: true`. It uses an existing `ghostty` apt package when available, then falls back to the community-maintained Debian/Ubuntu `.deb` package when `ghostty_community_deb_enabled: true`.
 
 The `dev_tools` role removes the distro `blender` package when `blender_remove_distro_package: true`, resolves the newest official Linux x64 Blender release from `download.blender.org` each run, installs it under `/opt/blender/current`, and links it at `/usr/local/bin/blender`.
+
+The `desktop_notifications` role installs dunst and `notify-send`, writes the target user's dunst config under `~/.config/dunst/dunstrc`, enables graphical autostart, and installs `/usr/local/bin/devastation-notify`. `devastation-up` and cluster project deployment use that helper for start, progress, success, and failure notifications. Set `DEVASTATION_NOTIFY=0` to silence script notifications.
 
 Refresh the official Neovim tarball intentionally:
 
@@ -134,6 +140,14 @@ These names are served under `deva.station`:
 - `development-db.deva.station`
 - `production-db.deva.station`
 - `otel-db.deva.station`
+- `iam-db.deva.station`
+- `keystone-db.deva.station`
+- `iam.deva.station`
+- `mail.deva.station`
+- `smtp.mail.deva.station`
+- `keystone.deva.station`
+- `s3.deva.station`
+- `seaweed.deva.station`
 
 ## Service Links
 
@@ -149,6 +163,11 @@ Browser-friendly local links:
 - [Vault](http://vault.deva.station:8200)
 - [TeamCity](http://teamcity.deva.station:8111)
 - [Eventline GoAWS](http://eventline.deva.station:4100)
+- [IAM](https://iam.deva.station)
+- [Mailpit](https://mail.deva.station)
+- [Keystone](https://keystone.deva.station)
+- [SeaweedFS S3](https://s3.deva.station)
+- [SeaweedFS Filer](https://seaweed.deva.station)
 - [MinIO API](http://storage.deva.station:9000)
 - [MinIO Console](http://storage.deva.station:9001)
 - [Local registry API](https://registry.deva.station/v2/)
@@ -173,10 +192,15 @@ Non-browser endpoints:
 - npm registry: `http://npm-cache.deva.station:4873`
 - pip index: `http://pypi-cache.deva.station:3141/root/pypi/+simple/`
 - RubyGems source: `http://gem-cache.deva.station:9292`
+- OIDC issuer: `https://iam.deva.station/realms/devastation`
+- SMTP: `smtp.mail.deva.station:1025`
+- SeaweedFS S3 endpoint: `https://s3.deva.station`
 - Postgres test DB: `postgres://devastation:devastation@test-db.deva.station:5432/test_db`
 - Postgres development DB: `postgres://devastation:devastation@development-db.deva.station:5432/development_db`
 - Postgres production DB: `postgres://devastation:devastation@production-db.deva.station:5432/production_db`
 - Postgres OTel DB: `postgres://devastation:devastation@otel-db.deva.station:5432/otel_db`
+- Postgres IAM DB: `postgres://devastation:devastation@iam-db.deva.station:5432/iam`
+- Postgres Keystone DB: `postgres://devastation:devastation@keystone-db.deva.station:5432/keystone`
 
 Ignored local cluster variables can add to the portal during bootstrap. Any `devastation_extra_dns_records` are shown as generic HTTPS cluster sites by default, and a local cluster can provide richer entries through `devastation_portal_extra_browser_links` or extra non-browser entries through `devastation_portal_extra_endpoint_links`:
 
@@ -191,6 +215,20 @@ devastation_portal_extra_browser_links:
 ## Registry
 
 The canonical local Kubernetes registry is `registry.deva.station` over HTTPS with the local root CA. Push private images there by tagging them with the registry hostname, for example `registry.deva.station/my-app:dev`. The pull-through Docker Hub cache is `registry-cache.deva.station`; Docker daemon registry mirrors use it for Docker Hub pulls, but Docker does not support rewriting unqualified pushes to a private registry. Host Docker trusts the CA through `/etc/docker/certs.d/registry.deva.station/ca.crt`; KIND nodes receive `/etc/containerd/certs.d/registry.deva.station/hosts.toml` and the CA certificate.
+
+There are three image paths:
+
+- Docker Hub pulls: use ordinary names such as `postgres:18.4`; Docker uses `registry-cache.deva.station:5000` as the pull-through mirror automatically.
+- Private/local images: tag them explicitly as `registry.deva.station/name:tag` or `registry.deva.station/project/name:tag`.
+- Non-Docker-Hub upstream images: `./bin/devastation-up` runs `devastation-mirror-images` after the private registry is available, pulling pinned upstream images and pushing them to `registry.deva.station/devastation-mirror/...`. Compose then uses the internal tags.
+
+Refresh mirrored upstream images intentionally:
+
+```bash
+DEVASTATION_MIRROR_FORCE=1 bin/devastation-mirror-images
+```
+
+The mirror manifest is generated at `/srv/devastation/compose/mirrored-images.tsv`.
 
 The `user_setup` role adds shell helpers for local pushes:
 
@@ -225,11 +263,19 @@ Both registry services expose Prometheus metrics on the internal registry metric
 
 ## Apt Cache
 
-Host apt uses:
+Host apt uses apt-cacher-ng for HTTP Debian/Ubuntu package sources:
 
 ```text
 Acquire::http::Proxy "http://apt-cache.deva.station:3142";
 Acquire::https::Proxy "DIRECT";
+```
+
+The Debian trixie sources on the local host should use `http://deb.debian.org/debian/` and `http://security.debian.org/debian-security` to be cached. Third-party HTTPS repositories such as Docker, VS Code, or Chrome intentionally go direct because HTTPS apt bodies cannot be transparently cached by apt-cacher-ng.
+
+Verify host apt proxy configuration:
+
+```bash
+cat /etc/apt/apt.conf.d/01devastation-proxy
 ```
 
 Refresh useful package and image caches while on fast internet:
@@ -436,7 +482,7 @@ Reset KIND only:
 Inspect logs:
 
 ```bash
-docker compose -f /srv/devastation/compose/compose.yml logs -f dns www registry registry-cache apt-cache vault teamcity eventline storage test-db development-db production-db otel-db prometheus grafana loki jaeger otel-collector node-exporter cadvisor gitlab gitlab-runner
+docker compose -f /srv/devastation/compose/compose.yml logs -f dns www registry registry-cache apt-cache vault teamcity eventline storage app-gateway iam mail keystone seaweed playwright test-db development-db production-db otel-db iam-db keystone-db prometheus grafana loki jaeger otel-collector node-exporter cadvisor gitlab gitlab-runner
 ```
 
 Regenerate by convergence:
@@ -455,7 +501,7 @@ Rotate certificates and reinstall trust:
 
 No generated secrets or private keys are committed. The root CA private key is an ephemeral build artifact and is destroyed after signing; validation fails if `/srv/devastation/ca/root-ca.key` exists after rotation. Generated secret directories are not world-readable.
 
-Some local-only development defaults are intentionally documented and low entropy: Vault token `devastation`, Postgres password `devastation`, MinIO password `devastation`, and Grafana admin password `devastation`. Change those variables before using this outside a disposable local development machine.
+Some local-only development defaults are intentionally documented and low entropy: Vault token `devastation`, Postgres password `devastation`, MinIO password `devastation`, Grafana admin password `devastation`, Keycloak demo credentials, Keystone admin credentials, and SeaweedFS S3 credentials. Change those variables before using this outside a disposable local development machine.
 
 Dangerous options and sensitive defaults are explicit in `group_vars/all.yml`:
 
@@ -468,5 +514,11 @@ Dangerous options and sensitive defaults are explicit in `group_vars/all.yml`:
 - `postgres_default_password`
 - `minio_root_password`
 - `grafana_admin_password`
+- `keycloak_admin_password`
+- `keycloak_dev_password`
+- `keycloak_demo_client_secret`
+- `keystone_admin_password`
+- `keystone_session_secret`
+- `seaweedfs_secret_key`
 
 Privileged surfaces are documented here: Docker itself, GitLab in Docker, KIND nodes, Kubernetes admin access, optional Docker socket mounting for runner jobs, Vault dev mode, cAdvisor host mounts, node-exporter host PID/rootfs mounts, local object/database services with default credentials, and tool/security-tool downloads such as Ghostty and Trivy.

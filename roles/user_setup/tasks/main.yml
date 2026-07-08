@@ -91,6 +91,50 @@
   become: true
   become_user: "{{ devastation_user }}"
 
+- name: Clone goenv for target user
+  ansible.builtin.git:
+    repo: "{{ goenv_repo }}"
+    dest: "{{ goenv_root }}"
+    version: master
+    recursive: false
+    update: "{{ user_setup_install_latest_versions | bool }}"
+  become: true
+  become_user: "{{ devastation_user }}"
+
+- name: Check for rustup
+  ansible.builtin.stat:
+    path: "{{ cargo_home }}/bin/rustup"
+  register: rustup_binary
+  become: true
+  become_user: "{{ devastation_user }}"
+
+- name: Download rustup installer for target user
+  ansible.builtin.get_url:
+    url: "{{ rustup_init_url }}"
+    dest: "{{ rustup_init_path }}"
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0755"
+  when: not rustup_binary.stat.exists
+
+- name: Install rustup for target user
+  ansible.builtin.command:
+    argv:
+      - "{{ rustup_init_path }}"
+      - -y
+      - --profile
+      - default
+      - --default-toolchain
+      - stable
+      - --no-modify-path
+  args:
+    creates: "{{ cargo_home }}/bin/rustup"
+  environment:
+    CARGO_HOME: "{{ cargo_home }}"
+    RUSTUP_HOME: "{{ rustup_home }}"
+  become: true
+  become_user: "{{ devastation_user }}"
+
 - name: Add pyenv initialization to profile
   ansible.builtin.blockinfile:
     path: "{{ user_setup_shell_profile }}"
@@ -147,6 +191,36 @@
       export TFENV_ROOT="$HOME/.tfenv"
       if [ -d "$TFENV_ROOT/bin" ]; then
         export PATH="$TFENV_ROOT/bin:$PATH"
+      fi
+
+- name: Add goenv initialization to profile
+  ansible.builtin.blockinfile:
+    path: "{{ user_setup_shell_profile }}"
+    create: true
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+    marker: "# {mark} DEVASTATION GOENV"
+    block: |
+      export GOENV_ROOT="$HOME/.goenv"
+      if [ -d "$GOENV_ROOT/bin" ]; then
+        export PATH="$GOENV_ROOT/bin:$PATH"
+        eval "$(goenv init -)"
+      fi
+
+- name: Add rustup initialization to profile
+  ansible.builtin.blockinfile:
+    path: "{{ user_setup_shell_profile }}"
+    create: true
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+    marker: "# {mark} DEVASTATION RUSTUP"
+    block: |
+      export CARGO_HOME="$HOME/.cargo"
+      export RUSTUP_HOME="$HOME/.rustup"
+      if [ -d "$CARGO_HOME/bin" ]; then
+        export PATH="$CARGO_HOME/bin:$PATH"
       fi
 
 - name: Add package cache defaults to profile
@@ -238,6 +312,21 @@
     block: |
       export VAULT_ADDR="http://vault.{{ devastation_domain }}:{{ vault_port }}"
       export VAULT_TOKEN="{{ vault_dev_root_token }}"
+
+- name: Source user setup profile from zsh startup files
+  ansible.builtin.blockinfile:
+    path: "{{ item }}"
+    create: true
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+    marker: "# {mark} DEVASTATION USER SETUP PROFILE"
+    block: |
+      if [ -f "{{ user_setup_shell_profile }}" ]; then
+        . "{{ user_setup_shell_profile }}"
+      fi
+  loop: "{{ user_setup_zsh_startup_files }}"
+  when: item != user_setup_shell_profile
 
 - name: Resolve latest stable CPython version
   ansible.builtin.shell: |
@@ -486,6 +575,98 @@
   when:
     - user_setup_install_latest_versions
     - user_setup_configure_package_mirrors
+
+- name: Resolve latest stable Go version
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export GOENV_ROOT="{{ goenv_root }}"
+    export PATH="{{ goenv_root }}/bin:$PATH"
+    eval "$("{{ goenv_root }}/bin/goenv" init - bash)"
+    "{{ goenv_root }}/bin/goenv" install -l \
+      | sed -nE 's/^[[:space:]]*([0-9]+\.[0-9]+(\.[0-9]+)?)$/\1/p' \
+      | sort -V \
+      | tail -n 1
+  args:
+    executable: /bin/bash
+  register: latest_go_version
+  changed_when: false
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Assert latest stable Go version resolved
+  ansible.builtin.assert:
+    that:
+      - latest_go_version.stdout | length > 0
+    fail_msg: "Unable to resolve the latest stable Go version from goenv."
+  when: user_setup_install_latest_versions
+
+- name: Check active goenv global version
+  ansible.builtin.command:
+    argv:
+      - "{{ goenv_root }}/bin/goenv"
+      - global
+  register: active_go_version
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Install latest stable Go version
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export GOENV_ROOT="{{ goenv_root }}"
+    export PATH="{{ goenv_root }}/bin:$PATH"
+    eval "$("{{ goenv_root }}/bin/goenv" init - bash)"
+    "{{ goenv_root }}/bin/goenv" install -s "{{ latest_go_version.stdout }}"
+  args:
+    executable: /bin/bash
+    creates: "{{ goenv_root }}/versions/{{ latest_go_version.stdout }}/bin/go"
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Set latest stable Go as goenv global
+  ansible.builtin.command:
+    argv:
+      - "{{ goenv_root }}/bin/goenv"
+      - global
+      - "{{ latest_go_version.stdout }}"
+  changed_when: active_go_version.stdout | default('') != latest_go_version.stdout
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Update stable Rust toolchain
+  ansible.builtin.command:
+    argv:
+      - "{{ cargo_home }}/bin/rustup"
+      - update
+      - stable
+  environment:
+    CARGO_HOME: "{{ cargo_home }}"
+    RUSTUP_HOME: "{{ rustup_home }}"
+  register: rustup_update
+  changed_when: "'unchanged' not in rustup_update.stdout"
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
+
+- name: Set stable Rust as default toolchain
+  ansible.builtin.command:
+    argv:
+      - "{{ cargo_home }}/bin/rustup"
+      - default
+      - stable
+  environment:
+    CARGO_HOME: "{{ cargo_home }}"
+    RUSTUP_HOME: "{{ rustup_home }}"
+  register: rustup_default
+  changed_when: "'unchanged' not in rustup_default.stdout"
+  become: true
+  become_user: "{{ devastation_user }}"
+  when: user_setup_install_latest_versions
 
 - name: Resolve latest stable Terraform version
   ansible.builtin.command:
