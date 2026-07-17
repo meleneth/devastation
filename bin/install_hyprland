@@ -1,0 +1,293 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# Build and update Hyprland's git main branch on Debian 13.
+# Source trees and build artifacts are retained so subsequent runs are incremental.
+
+SOURCE_ROOT="${HYPRLAND_SOURCE_ROOT:-${XDG_CACHE_HOME:-${HOME}/.cache}/hyprland-source}"
+PREFIX="${HYPRLAND_PREFIX:-/usr/local}"
+JOBS="${HYPRLAND_JOBS:-$(nproc)}"
+APT_PROXY="${HYPRLAND_APT_PROXY:-http://apt-cache.deva.station:3142}"
+SCRIPT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+SKIP_APT=0
+GCC_VERSION=16.1.0
+
+usage() {
+  cat <<'EOF'
+Usage: install_hyprland [--no-apt] [--source-root DIR] [--prefix DIR] [--jobs N]
+
+Clone or fast-forward the current Hyprland source stack, build it, and install it.
+Defaults:
+  source root  $XDG_CACHE_HOME/hyprland-source (or ~/.cache/hyprland-source)
+  prefix       /usr/local
+  jobs         number of online CPUs
+
+Environment variables: HYPRLAND_SOURCE_ROOT, HYPRLAND_PREFIX, HYPRLAND_JOBS,
+HYPRLAND_APT_PROXY. Logs are saved below SOURCE_ROOT/logs, and latest.log points
+to the most recent run. The source checkouts must be clean before they can be updated.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --no-apt) SKIP_APT=1; shift ;;
+    --source-root) SOURCE_ROOT="${2:?--source-root requires a directory}"; shift 2 ;;
+    --prefix) PREFIX="${2:?--prefix requires a directory}"; shift 2 ;;
+    --jobs) JOBS="${2:?--jobs requires a number}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+GCC_PREFIX="${SOURCE_ROOT}/toolchains/gcc-${GCC_VERSION}"
+
+[[ "$JOBS" =~ ^[1-9][0-9]*$ ]] || { echo "--jobs must be a positive integer" >&2; exit 2; }
+command -v sudo >/dev/null || { echo "sudo is required" >&2; exit 1; }
+
+LOG_DIR="${SOURCE_ROOT}/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="${LOG_DIR}/install-$(date -u +%Y%m%dT%H%M%SZ).log"
+ln -sfn "$(basename "$LOG_FILE")" "${LOG_DIR}/latest.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+trap 'status=$?; echo "ERROR: command failed with status ${status} at ${BASH_SOURCE[0]}:${LINENO}: ${BASH_COMMAND}"; echo "Full log: ${LOG_FILE}"; exit "$status"' ERR
+echo "Full log: ${LOG_FILE}"
+
+APT_PACKAGES=(
+  bison build-essential ca-certificates ccache cmake curl flex git hwdata meson
+  ninja-build pkg-config python3 scdoc wayland-protocols xz-utils
+  libavcodec-dev libavformat-dev libavutil-dev libcairo2-dev libdisplay-info-dev
+  libdrm-dev libeis-dev libegl-dev libffi-dev libfontconfig-dev libgbm-dev
+  libgles-dev libglvnd-dev libinput-dev libjpeg-dev liblcms2-dev libliftoff-dev
+  libexpat1-dev libmagic-dev
+  libgmp-dev libisl-dev libmpc-dev libmpfr-dev libmuparser-dev libpango1.0-dev
+  libpcre2-dev libpixman-1-dev libpugixml-dev libre2-dev libsdbus-c++-dev
+  libseat-dev libsystemd-dev libtomlplusplus-dev libudev-dev libwayland-dev
+  librsvg2-dev libzip-dev
+  libxcb-composite0-dev libxcb-errors-dev libxcb-icccm4-dev libxcb-present-dev
+  libxcb-render-util0-dev libxcb-res0-dev libxcb-xfixes0-dev libxcb-xinput-dev
+  libxcb-xkb-dev
+  libxcb1-dev libxcursor-dev libxml2-dev libxkbcommon-dev libxkbregistry-dev
+  glslang-dev glslang-tools seatd uuid-dev xwayland zlib1g-dev
+)
+
+if ((SKIP_APT == 0)); then
+  echo "Installing build dependencies through ${APT_PROXY}"
+  sudo apt-get -o "Acquire::http::Proxy=${APT_PROXY}" -o Acquire::https::Proxy=DIRECT update
+  sudo apt-get -o "Acquire::http::Proxy=${APT_PROXY}" -o Acquire::https::Proxy=DIRECT \
+    install -y --no-install-recommends "${APT_PACKAGES[@]}"
+fi
+
+mkdir -p "$SOURCE_ROOT"
+
+build_gcc() {
+  local archive="${SOURCE_ROOT}/gcc-${GCC_VERSION}.tar.xz"
+  local source="${SOURCE_ROOT}/gcc-${GCC_VERSION}"
+  local build="${SOURCE_ROOT}/gcc-${GCC_VERSION}-build"
+  local url="https://gcc.gnu.org/pub/gcc/releases/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz"
+
+  if [[ -x "${GCC_PREFIX}/bin/g++" ]]; then
+    echo "Using cached GCC ${GCC_VERSION} from ${GCC_PREFIX}"
+    return
+  fi
+
+  echo "Building GCC ${GCC_VERSION}; the first build can take a while"
+  if [[ ! -f "$archive" ]]; then
+    curl -fL --retry 3 -o "${archive}.part" "$url"
+    mv "${archive}.part" "$archive"
+  fi
+  if [[ ! -f "${source}/configure" ]]; then
+    tar -C "$SOURCE_ROOT" -xf "$archive"
+  fi
+  mkdir -p "$build"
+  (
+    cd "$build"
+    "${source}/configure" \
+      --prefix="$GCC_PREFIX" \
+      --disable-bootstrap \
+      --disable-multilib \
+      --disable-nls \
+      --enable-languages=c,c++ \
+      --with-system-zlib
+  )
+  make -C "$build" -j "$JOBS"
+  make -C "$build" install
+}
+
+build_gcc
+export CC="${GCC_PREFIX}/bin/gcc"
+export CXX="${GCC_PREFIX}/bin/g++"
+export PATH="${GCC_PREFIX}/bin:${PATH}"
+export LD_LIBRARY_PATH="${GCC_PREFIX}/lib64:${GCC_PREFIX}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+echo "Building Hyprland stack with $("$CXX" --version | head -n 1)"
+
+multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+export PKG_CONFIG_PATH="${PREFIX}/lib/${multiarch}/pkgconfig:${PREFIX}/lib/pkgconfig:${PREFIX}/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export PATH="${PREFIX}/bin:${PATH}"
+export CMAKE_PREFIX_PATH="${PREFIX}${CMAKE_PREFIX_PATH:+;${CMAKE_PREFIX_PATH}}"
+
+sync_repo() {
+  local name="$1" url="$2" branch="${3:-main}"
+  local directory="${SOURCE_ROOT}/${name}"
+  if [[ ! -d "${directory}/.git" ]]; then
+    git clone --recursive --branch "$branch" "$url" "$directory"
+  else
+    if [[ -n "$(git -C "$directory" status --porcelain --untracked-files=no)" ]]; then
+      echo "Refusing to update dirty checkout: ${directory}" >&2
+      exit 1
+    fi
+    git -C "$directory" fetch --prune origin
+    git -C "$directory" checkout "$branch"
+    git -C "$directory" merge --ff-only "origin/${branch}"
+    git -C "$directory" submodule sync --recursive
+    git -C "$directory" submodule update --init --recursive
+  fi
+}
+
+build_cmake() {
+  local name="$1"; shift
+  local directory="${SOURCE_ROOT}/${name}"
+  echo "Building ${name}"
+  cmake --fresh -S "$directory" -B "${directory}/build" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+    -DCMAKE_INSTALL_LIBDIR="lib/${multiarch}" \
+    -DCMAKE_LIBRARY_PATH="${PREFIX}/lib/${multiarch};${PREFIX}/lib" "$@"
+  cmake --build "${directory}/build" --parallel "$JOBS"
+  sudo cmake --install "${directory}/build"
+  sudo ldconfig
+}
+
+build_meson() {
+  local name="$1"; shift
+  local directory="${SOURCE_ROOT}/${name}"
+  local -a meson_options
+  echo "Building ${name}"
+  meson_options=(--buildtype=release --prefix="$PREFIX" --libdir="lib/${multiarch}" "$@")
+  if [[ -f "${directory}/build/meson-private/coredata.dat" ]]; then
+    meson setup "${directory}/build" "$directory" --wipe "${meson_options[@]}"
+  else
+    meson setup "${directory}/build" "$directory" "${meson_options[@]}"
+  fi
+  meson compile -C "${directory}/build" -j "$JOBS"
+  sudo meson install -C "${directory}/build"
+  sudo ldconfig
+}
+
+# Hyprland main currently requires versions newer than Debian 13 supplies.
+# Build Wayland first: current wayland-protocols XML uses DTD additions that
+# Debian 13's wayland-scanner 1.23 does not understand.
+sync_repo wayland https://gitlab.freedesktop.org/wayland/wayland.git
+build_meson wayland -Ddocumentation=false -Dtests=false
+sync_repo wayland-protocols https://gitlab.freedesktop.org/wayland/wayland-protocols.git
+build_meson wayland-protocols -Dtests=false
+sync_repo libinput https://gitlab.freedesktop.org/libinput/libinput.git
+build_meson libinput -Ddocumentation=false -Dtests=false -Dlibwacom=false -Ddebug-gui=false
+sync_repo libxkbcommon https://github.com/xkbcommon/libxkbcommon.git master
+build_meson libxkbcommon -Denable-docs=false -Denable-tools=false -Denable-x11=true
+
+# Hyprland's Lua configuration support requires Lua 5.5; Trixie has 5.4.
+sync_repo lua https://github.com/lua/lua.git master
+echo "Building lua"
+make -C "${SOURCE_ROOT}/lua" clean
+make -C "${SOURCE_ROOT}/lua" -j "$JOBS" \
+  CC="$CC" \
+  CFLAGS="-O2 -fPIC -std=c99 -DLUA_USE_LINUX"
+sudo install -Dm755 "${SOURCE_ROOT}/lua/lua" "${PREFIX}/bin/lua"
+sudo install -Dm644 "${SOURCE_ROOT}/lua/liblua.a" "${PREFIX}/lib/liblua.a"
+for header in lua.h luaconf.h lauxlib.h lualib.h; do
+  sudo install -Dm644 "${SOURCE_ROOT}/lua/${header}" "${PREFIX}/include/${header}"
+done
+sudo install -Dm644 "${SCRIPT_ROOT}/assets/lua.hpp" "${PREFIX}/include/lua.hpp"
+lua_version="$("${SOURCE_ROOT}/lua/lua" -v 2>&1 | awk '{print $2}')"
+lua_pc="$(mktemp)"
+trap 'rm -f "$lua_pc"' EXIT
+sed \
+  -e "s|@PREFIX@|${PREFIX}|g" \
+  -e "s|@VERSION@|${lua_version}|g" >"$lua_pc" <<'EOF'
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: Lua
+Description: An extensible extension language
+Version: @VERSION@
+Libs: -L${libdir} -llua -lm -ldl
+Cflags: -I${includedir}
+EOF
+sudo install -Dm644 "$lua_pc" "${PREFIX}/lib/pkgconfig/lua.pc"
+sudo ln -sfn lua.pc "${PREFIX}/lib/pkgconfig/lua5.5.pc"
+sudo ln -sfn lua.pc "${PREFIX}/lib/pkgconfig/lua55.pc"
+sudo ldconfig
+
+for spec in \
+  "hyprutils|https://github.com/hyprwm/hyprutils.git" \
+  "hyprwire|https://github.com/hyprwm/hyprwire.git" \
+  "hyprwayland-scanner|https://github.com/hyprwm/hyprwayland-scanner.git" \
+  "hyprlang|https://github.com/hyprwm/hyprlang.git" \
+  "hyprcursor|https://github.com/hyprwm/hyprcursor.git" \
+  "hyprgraphics|https://github.com/hyprwm/hyprgraphics.git" \
+  "aquamarine|https://github.com/hyprwm/aquamarine.git"; do
+  IFS='|' read -r name url <<<"$spec"
+  sync_repo "$name" "$url"
+  cmake_args=(-DBUILD_TESTING=OFF)
+  if [[ "$name" == aquamarine ]]; then
+    cmake_args+=("-Dpkgcfg_lib_deps_input=${PREFIX}/lib/${multiarch}/libinput.so")
+  fi
+  build_cmake "$name" "${cmake_args[@]}"
+done
+
+sync_repo Hyprland https://github.com/hyprwm/Hyprland.git
+build_cmake Hyprland -DBUILD_TESTING=OFF
+
+# LightDM only scans the distribution session directory, even when Hyprland is
+# installed below /usr/local. Register the generated entries there and remember
+# Hyprland as the invoking user's next session.
+session_source="${PREFIX}/share/wayland-sessions"
+session_target="/usr/share/wayland-sessions"
+shopt -s nullglob
+session_files=("${session_source}"/hyprland*.desktop)
+shopt -u nullglob
+if ((${#session_files[@]} == 0)); then
+  echo "No Hyprland session files found below ${session_source}" >&2
+  exit 1
+fi
+if [[ "$session_source" != "$session_target" ]]; then
+  sudo install -d -m755 "$session_target"
+  for session_file in "${session_files[@]}"; do
+    sudo install -m644 "$session_file" "${session_target}/$(basename "$session_file")"
+  done
+fi
+
+dmrc="${HOME}/.dmrc"
+dmrc_tmp="$(mktemp)"
+trap 'rm -f "$lua_pc" "$dmrc_tmp"' EXIT
+awk '
+  /^\[.*\]$/ {
+    if (in_desktop && !session_written) print "Session=hyprland"
+    in_desktop = ($0 == "[Desktop]")
+    if (in_desktop) desktop_seen = 1
+    print
+    next
+  }
+  in_desktop && /^Session=/ {
+    if (!session_written) print "Session=hyprland"
+    session_written = 1
+    next
+  }
+  { print }
+  END {
+    if (in_desktop && !session_written) print "Session=hyprland"
+    if (!desktop_seen) {
+      print "[Desktop]"
+      print "Session=hyprland"
+    }
+  }
+' "$dmrc" 2>/dev/null >"$dmrc_tmp" || {
+  printf '[Desktop]\nSession=hyprland\n' >"$dmrc_tmp"
+}
+install -m600 "$dmrc_tmp" "$dmrc"
+
+echo
+"${PREFIX}/bin/Hyprland" --version
+echo "Hyprland is installed and selected for the next LightDM login."
+echo "Run this script again whenever you want to update it."
