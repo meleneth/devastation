@@ -2,6 +2,8 @@
 cluster/
 *.log
 error.txt
+core
+core.*
 node_modules/
 docs/.vitepress/.temp/
 docs/.vitepress/cache/

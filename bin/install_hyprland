@@ -239,6 +239,26 @@ done
 sync_repo Hyprland https://github.com/hyprwm/Hyprland.git
 build_cmake Hyprland -DBUILD_TESTING=OFF
 
+# Hyprland main needs a newer compiler than Debian 13 provides.  Keep that
+# compiler's C++ runtime private to Hyprland instead of replacing Debian's
+# system libstdc++, and launch the session with the matching runtime available.
+runtime_dir="${PREFIX}/lib/hyprland-gcc-${GCC_VERSION}"
+libstdcpp_source="$(readlink -f "${GCC_PREFIX}/lib64/libstdc++.so.6")"
+sudo install -d -m755 "$runtime_dir"
+sudo install -m755 "$libstdcpp_source" "$runtime_dir/"
+sudo ln -sfn "$(basename "$libstdcpp_source")" "${runtime_dir}/libstdc++.so.6"
+session_launcher_tmp="$(mktemp)"
+trap 'rm -f "${lua_pc:-}" "${dmrc_tmp:-}" "${session_launcher_tmp:-}"' EXIT
+sed \
+  -e "s|@RUNTIME_DIR@|${runtime_dir}|g" \
+  -e "s|@PREFIX@|${PREFIX}|g" >"$session_launcher_tmp" <<'EOF'
+#!/bin/sh
+export LD_LIBRARY_PATH="@RUNTIME_DIR@${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export AQ_DRM_DEVICES="/dev/dri/by-path/pci-0000:03:00.0-card"
+exec "@PREFIX@/bin/start-hyprland" "$@"
+EOF
+sudo install -m755 "$session_launcher_tmp" "${PREFIX}/bin/start-hyprland-session"
+
 # LightDM only scans the distribution session directory, even when Hyprland is
 # installed below /usr/local. Register the generated entries there and remember
 # Hyprland as the invoking user's next session.
@@ -254,7 +274,16 @@ fi
 if [[ "$session_source" != "$session_target" ]]; then
   sudo install -d -m755 "$session_target"
   for session_file in "${session_files[@]}"; do
-    sudo install -m644 "$session_file" "${session_target}/$(basename "$session_file")"
+    session_target_file="${session_target}/$(basename "$session_file")"
+    if [[ "$(basename "$session_file")" == "hyprland.desktop" ]]; then
+      session_file_tmp="$(mktemp)"
+      sed "s|^Exec=.*|Exec=${PREFIX}/bin/start-hyprland-session|" \
+        "$session_file" >"$session_file_tmp"
+      sudo install -m644 "$session_file_tmp" "$session_target_file"
+      rm -f "$session_file_tmp"
+    else
+      sudo install -m644 "$session_file" "$session_target_file"
+    fi
   done
 fi
 
@@ -288,6 +317,6 @@ awk '
 install -m600 "$dmrc_tmp" "$dmrc"
 
 echo
-"${PREFIX}/bin/Hyprland" --version
+env LD_LIBRARY_PATH="$runtime_dir" "${PREFIX}/bin/Hyprland" --version
 echo "Hyprland is installed and selected for the next LightDM login."
 echo "Run this script again whenever you want to update it."

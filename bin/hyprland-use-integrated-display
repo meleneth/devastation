@@ -1,0 +1,39 @@
+#!/bin/sh
+set -eu
+
+launcher=/usr/local/bin/start-hyprland-session
+hyprland_launcher=/usr/local/bin/start-hyprland
+gpu_pci=0000:c5:00.0
+gpu=/dev/dri/by-path/pci-${gpu_pci}-card
+runtime=/usr/local/lib/hyprland-gcc-16.1.0
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT HUP INT TERM
+
+# On this machine the Phoenix integrated GPU owns the connected eDP panel.
+if [ ! -e "/sys/bus/pci/devices/$gpu_pci" ]; then
+  echo "Integrated display GPU not found at PCI $gpu_pci" >&2
+  exit 1
+fi
+
+if [ ! -x "$hyprland_launcher" ]; then
+  echo "Hyprland launcher not found: $hyprland_launcher" >&2
+  exit 1
+fi
+
+if [ ! -e "$runtime/libstdc++.so.6" ]; then
+  echo "Hyprland GCC runtime not found: $runtime/libstdc++.so.6" >&2
+  exit 1
+fi
+
+cat >"$tmp" <<EOF
+#!/bin/sh
+export LD_LIBRARY_PATH="$runtime\${LD_LIBRARY_PATH:+:\${LD_LIBRARY_PATH}}"
+export AQ_DRM_DEVICES="$gpu"
+exec "$hyprland_launcher" "\$@"
+EOF
+
+sudo install -m755 "$tmp" "$launcher"
+
+grep -Fq "AQ_DRM_DEVICES=\"$gpu\"" "$launcher"
+echo "Configured the regular Hyprland session to use only the integrated GPU ($gpu_pci)."
+echo "Log out and select 'Hyprland' (not 'Hyprland (uwsm-managed)')."

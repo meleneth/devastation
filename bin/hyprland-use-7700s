@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+
+launcher=/usr/local/bin/start-hyprland-session
+gpu=/dev/dri/by-path/pci-0000:03:00.0-card
+runtime=/usr/local/lib/hyprland-gcc-16.1.0
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT HUP INT TERM
+
+if [ ! -e "$gpu" ]; then
+  echo "RX 7700S DRM device not found: $gpu" >&2
+  exit 1
+fi
+
+if [ ! -x /usr/local/bin/start-hyprland ]; then
+  echo "Hyprland launcher not found: /usr/local/bin/start-hyprland" >&2
+  exit 1
+fi
+
+if [ ! -e "$runtime/libstdc++.so.6" ]; then
+  echo "Hyprland GCC runtime not found: $runtime/libstdc++.so.6" >&2
+  exit 1
+fi
+
+cat >"$tmp" <<'EOF'
+#!/bin/sh
+export LD_LIBRARY_PATH="/usr/local/lib/hyprland-gcc-16.1.0${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export AQ_DRM_DEVICES="/dev/dri/by-path/pci-0000:03:00.0-card"
+exec /usr/local/bin/start-hyprland "$@"
+EOF
+
+sudo install -m755 "$tmp" "$launcher"
+
+grep -Fq "AQ_DRM_DEVICES=\"$gpu\"" "$launcher"
+echo "Configured the regular Hyprland session to use only the RX 7700S."
+echo "Log out and select 'Hyprland' (not 'Hyprland (uwsm-managed)')."
