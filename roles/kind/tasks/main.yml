@@ -170,6 +170,18 @@
   changed_when: true
   when: kind_install_platform_addons | bool
 
+- name: Add Helm repository for MetalLB
+  ansible.builtin.command:
+    argv:
+      - helm
+      - repo
+      - add
+      - metallb
+      - "{{ metallb_helm_repo }}"
+      - --force-update
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
 - name: Refresh Helm repositories
   ansible.builtin.command:
     argv:
@@ -252,6 +264,121 @@
       - 10m
       - --set
       - "service.type={{ istio_gateway_service_type }}"
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
+- name: Adopt existing cluster-scoped MetalLB resources into Helm
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - label
+      - "{{ item }}"
+      - app.kubernetes.io/managed-by=Helm
+      - --overwrite
+  loop:
+    - customresourcedefinition/bfdprofiles.metallb.io
+    - customresourcedefinition/bgpadvertisements.metallb.io
+    - customresourcedefinition/bgppeers.metallb.io
+    - customresourcedefinition/communities.metallb.io
+    - customresourcedefinition/ipaddresspools.metallb.io
+    - customresourcedefinition/l2advertisements.metallb.io
+    - customresourcedefinition/servicel2statuses.metallb.io
+    - clusterrole/metallb-system:controller
+    - clusterrole/metallb-system:speaker
+    - clusterrolebinding/metallb-system:controller
+    - clusterrolebinding/metallb-system:speaker
+    - validatingwebhookconfiguration/metallb-webhook-configuration
+  register: metallb_helm_adoption_labels
+  changed_when: "'not labeled' not in metallb_helm_adoption_labels.stdout"
+  failed_when:
+    - metallb_helm_adoption_labels.rc != 0
+    - "'not found' not in metallb_helm_adoption_labels.stderr"
+  when: kind_install_platform_addons | bool
+
+- name: Annotate existing cluster-scoped MetalLB resources for Helm
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - annotate
+      - "{{ item }}"
+      - meta.helm.sh/release-name=metallb
+      - meta.helm.sh/release-namespace=metallb-system
+      - --overwrite
+  loop:
+    - customresourcedefinition/bfdprofiles.metallb.io
+    - customresourcedefinition/bgpadvertisements.metallb.io
+    - customresourcedefinition/bgppeers.metallb.io
+    - customresourcedefinition/communities.metallb.io
+    - customresourcedefinition/ipaddresspools.metallb.io
+    - customresourcedefinition/l2advertisements.metallb.io
+    - customresourcedefinition/servicel2statuses.metallb.io
+    - clusterrole/metallb-system:controller
+    - clusterrole/metallb-system:speaker
+    - clusterrolebinding/metallb-system:controller
+    - clusterrolebinding/metallb-system:speaker
+    - validatingwebhookconfiguration/metallb-webhook-configuration
+  register: metallb_helm_adoption_annotations
+  changed_when: "'not annotated' not in metallb_helm_adoption_annotations.stdout"
+  failed_when:
+    - metallb_helm_adoption_annotations.rc != 0
+    - "'not found' not in metallb_helm_adoption_annotations.stderr"
+  when: kind_install_platform_addons | bool
+
+- name: Install MetalLB
+  ansible.builtin.command:
+    argv:
+      - helm
+      - upgrade
+      - --install
+      - metallb
+      - metallb/metallb
+      - --version
+      - "{{ metallb_version }}"
+      - --namespace
+      - metallb-system
+      - --create-namespace
+      - --wait
+      - --timeout
+      - 5m
+      - --force-conflicts
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
+- name: Render MetalLB edge configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/metallb-edge.yml.j2"
+    dest: "{{ devastation_paths.kind }}/metallb-edge.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  when: kind_install_platform_addons | bool
+
+- name: Apply MetalLB edge configuration
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - --filename
+      - "{{ devastation_paths.kind }}/metallb-edge.yml"
+  changed_when: true
+  when: kind_install_platform_addons | bool
+
+- name: Render shared Istio edge configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/istio-edge.yml.j2"
+    dest: "{{ devastation_paths.kind }}/istio-edge.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  when: kind_install_platform_addons | bool
+
+- name: Apply shared Istio edge configuration
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - apply
+      - --filename
+      - "{{ devastation_paths.kind }}/istio-edge.yml"
   changed_when: true
   when: kind_install_platform_addons | bool
 

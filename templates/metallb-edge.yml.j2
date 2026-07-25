@@ -1,0 +1,19 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: devastation-edge
+  namespace: metallb-system
+spec:
+  addresses:
+{% for record in devastation_extra_dns_records %}
+    - {{ record.ip }}/32
+{% endfor %}
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: devastation-edge
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - devastation-edge

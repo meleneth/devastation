@@ -1,0 +1,55 @@
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: sectorfour-mirror
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/part-of: sectorfour-mirror
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+{% for record in devastation_extra_dns_records %}
+        - {{ record.name }}
+{% endfor %}
+{% for record in devastation_extra_dns_records %}
+    - port:
+        number: 443
+        name: https-{{ record.name.split('.')[0] | replace('_', '-') }}
+        protocol: HTTPS
+      hosts:
+        - {{ record.name }}
+      tls:
+        mode: SIMPLE
+        credentialName: {{ record.name.split('.')[0] }}-tls
+{% endfor %}
+{% for record in devastation_extra_dns_records %}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ record.name.split('.')[0] }}-istio-edge
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/part-of: sectorfour-mirror
+spec:
+  type: LoadBalancer
+  loadBalancerIP: {{ record.ip }}
+  selector:
+    app: istio-ingressgateway
+    istio: ingressgateway
+  ports:
+    - name: http2
+      port: 80
+      protocol: TCP
+      targetPort: 80
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: 443
+{% endfor %}
