@@ -130,6 +130,8 @@
     - name: Apply KIND role
       ansible.builtin.import_role:
         name: kind
+      environment:
+        KUBECONFIG: "{{ kind_user_kubeconfig }}"
 
     - name: Apply datastore role
       ansible.builtin.import_role:
