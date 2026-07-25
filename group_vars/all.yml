@@ -41,6 +41,7 @@ devastation_subnets:
   keystone: 172.30.42.42
   seaweed: 172.30.42.43
   playwright: 172.30.42.44
+  apt_cache_transparent: 172.30.42.45
 
 devastation_dns_records:
   - name: "{{ devastation_domain }}"
@@ -163,6 +164,7 @@ devastation_portal_extra_endpoint_links: []
 devastation_paths:
   certs: "{{ devastation_root }}/certs"
   ca: "{{ devastation_root }}/ca"
+  workload_trust: "{{ devastation_root }}/workload-trust"
   secrets: "{{ devastation_root }}/secrets"
   compose: "{{ devastation_root }}/compose"
   dns: "{{ devastation_root }}/dns"
@@ -307,6 +309,20 @@ dns_configure_hosts_file: true
 dns_configure_host_resolver: true
 dns_systemd_resolved_dropin: /etc/systemd/resolved.conf.d/devastation.conf
 
+# Docker and KIND clients resolve these well-known distribution repositories to
+# the transparent port-80 frontend. apt-cacher-ng resolves its own upstreams
+# through dns_upstream_resolvers, preventing a proxy loop.
+apt_cache_transparent_enabled: true
+apt_cache_repository_hostnames:
+  - deb.debian.org
+  - security.debian.org
+  - archive.debian.org
+  - ftp.debian.org
+  - archive.ubuntu.com
+  - security.ubuntu.com
+  - ports.ubuntu.com
+  - old-releases.ubuntu.com
+
 ca_install_host_trust: true
 ca_install_browser_nss_trust: true
 ca_nss_cert_name: "Devastation Local Root CA"
@@ -341,6 +357,7 @@ registry_pull_through_remoteurl: https://registry-1.docker.io
 registry_metrics_port: 5001
 
 apt_cache_port: 3142
+apt_cache_transparent_port: 80
 apt_cache_configure_host: true
 apt_cache_prefetch_packages:
   - git

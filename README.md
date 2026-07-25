@@ -272,6 +272,13 @@ Acquire::https::Proxy "DIRECT";
 
 The Debian trixie sources on the local host should use `http://deb.debian.org/debian/` and `http://security.debian.org/debian-security` to be cached. Third-party HTTPS repositories such as Docker, VS Code, or Chrome intentionally go direct because HTTPS apt bodies cannot be transparently cached by apt-cacher-ng.
 
+Docker and KIND DNS also redirect the standard Debian and Ubuntu HTTP archive
+hostnames to a port-80 frontend for apt-cacher-ng. Consequently, unmodified
+Debian/Ubuntu containers and ordinary Docker build steps use the cache without
+proxy flags. The cache container itself uses the configured upstream resolvers
+directly to avoid a DNS loop. HTTPS repositories remain end-to-end encrypted
+and are not cached by this mechanism.
+
 Verify host apt proxy configuration:
 
 ```bash

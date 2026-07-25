@@ -12,6 +12,18 @@
     }
 }
 
+{% if apt_cache_transparent_enabled %}
+{% for hostname in apt_cache_repository_hostnames %}
+{{ hostname }}:53 {
+    errors
+    log
+    hosts {
+        {{ devastation_subnets.apt_cache_transparent }} {{ hostname }}
+    }
+}
+
+{% endfor %}
+{% endif %}
 .:53 {
     errors
     cache 30

@@ -40,6 +40,7 @@
         - { path: "{{ devastation_root }}", mode: "0755" }
         - { path: "{{ devastation_paths.certs }}", mode: "0755" }
         - { path: "{{ devastation_paths.ca }}", mode: "0700" }
+        - { path: "{{ devastation_paths.workload_trust }}", mode: "0755" }
         - { path: "{{ devastation_paths.secrets }}", mode: "0700" }
         - { path: "{{ devastation_paths.compose }}", mode: "0755" }
         - { path: "{{ devastation_paths.observability }}", mode: "0755" }

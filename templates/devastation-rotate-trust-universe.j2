@@ -6,6 +6,7 @@ ROOT="{{ devastation_root }}"
 CA_DIR="{{ devastation_paths.ca }}"
 CERTS_DIR="{{ devastation_paths.certs }}"
 PUBLIC_CA_CERT="/usr/local/share/ca-certificates/devastation-root-ca.crt"
+WORKLOAD_TRUST_DIR="{{ devastation_paths.workload_trust }}"
 COMPOSE_FILE="{{ devastation_paths.compose }}/compose.yml"
 DOMAIN="{{ devastation_domain }}"
 CA_NAME="{{ ca_common_name }}"
@@ -248,6 +249,10 @@ install_trust_artifacts() {
   install -m 0644 "$staged_ca_crt" "${CA_DIR}/root-ca.crt"
   install -m 0644 "$staged_ca_crt" /usr/local/share/ca-certificates/devastation-root-ca.crt
   update-ca-certificates >/dev/null
+  install -m 0644 /etc/ssl/certs/ca-certificates.crt "${CA_DIR}/ca-certificates.crt"
+  mkdir -p "$WORKLOAD_TRUST_DIR"
+  chmod 0755 "$WORKLOAD_TRUST_DIR"
+  install -m 0644 /etc/ssl/certs/ca-certificates.crt "${WORKLOAD_TRUST_DIR}/ca-certificates.crt"
 
   local name
   for name in "${LEAF_CERTS[@]}"; do

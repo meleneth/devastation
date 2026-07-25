@@ -7,11 +7,19 @@
     group: root
     mode: "0755"
 
+- name: Configure transparent apt cache frontend
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/apt-cache-transparent-nginx.conf.j2"
+    dest: "{{ devastation_paths.apt_cache }}/transparent-nginx.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  when: apt_cache_transparent_enabled | bool
+
 - name: Start apt cache service
   community.docker.docker_compose_v2:
     project_src: "{{ devastation_paths.compose }}"
-    services:
-      - apt-cache
+    services: "{{ ['apt-cache'] + (['apt-cache-transparent'] if apt_cache_transparent_enabled else []) }}"
     state: present
 
 - name: Wait for apt cache service
@@ -28,3 +36,10 @@
     group: root
     mode: "0644"
   when: apt_cache_configure_host
+
+- name: Wait for transparent apt cache frontend
+  ansible.builtin.wait_for:
+    host: "{{ devastation_subnets.apt_cache_transparent }}"
+    port: "{{ apt_cache_transparent_port }}"
+    timeout: 60
+  when: apt_cache_transparent_enabled | bool

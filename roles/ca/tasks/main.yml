@@ -104,6 +104,26 @@
   when: ca_install_host_trust
   notify: Update ca certificates
 
+- name: Update host CA bundle before publishing it to workloads
+  ansible.builtin.meta: flush_handlers
+
+- name: Publish combined public and Devastation CA bundle for workloads
+  ansible.builtin.copy:
+    src: /etc/ssl/certs/ca-certificates.crt
+    dest: "{{ devastation_paths.workload_trust }}/ca-certificates.crt"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Publish workload CA environment
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/workload-ca.env.j2"
+    dest: "{{ devastation_paths.workload_trust }}/workload-ca.env"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Ensure user NSS database directory exists
   ansible.builtin.file:
     path: "{{ item }}"

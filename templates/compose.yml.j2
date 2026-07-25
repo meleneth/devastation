@@ -1,5 +1,13 @@
+x-devastation-trust: &devastation-trust
+  env_file:
+    - {{ devastation_paths.workload_trust }}/workload-ca.env
+  configs:
+    - source: devastation-ca-bundle
+      target: /etc/devastation/ca-certificates.crt
+
 services:
   dns:
+    <<: *devastation-trust
     image: coredns/coredns:1.11.1
     command: ["-conf", "/etc/coredns/Corefile"]
     restart: unless-stopped
@@ -13,6 +21,7 @@ services:
         ipv4_address: {{ devastation_subnets.dns }}
 
   registry:
+    <<: *devastation-trust
     image: registry:2.8.3
     restart: unless-stopped
     environment:
@@ -41,6 +50,7 @@ services:
 
 {% if registry_pull_through_cache_enabled %}
   registry-cache:
+    <<: *devastation-trust
     image: registry:2.8.3
     restart: unless-stopped
     environment:
@@ -58,8 +68,13 @@ services:
 {% endif %}
 
   apt-cache:
+    <<: *devastation-trust
     image: sameersbn/apt-cacher-ng:3.7.4-20220421
     restart: unless-stopped
+    dns:
+{% for resolver in dns_upstream_resolvers %}
+      - {{ resolver }}
+{% endfor %}
     volumes:
       - {{ devastation_paths.apt_cache }}/data:/var/cache/apt-cacher-ng
     ports:
@@ -68,7 +83,22 @@ services:
       devastation:
         ipv4_address: {{ devastation_subnets.apt_cache }}
 
+{% if apt_cache_transparent_enabled %}
+  apt-cache-transparent:
+    <<: *devastation-trust
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - apt-cache
+    volumes:
+      - {{ devastation_paths.apt_cache }}/transparent-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.apt_cache_transparent }}
+
+{% endif %}
   npm-cache:
+    <<: *devastation-trust
     image: {{ npm_cache_image }}
     restart: unless-stopped
     environment:
@@ -85,6 +115,7 @@ services:
         ipv4_address: {{ devastation_subnets.npm_cache }}
 
   pypi-cache:
+    <<: *devastation-trust
     image: {{ pypi_cache_image }}
     restart: unless-stopped
     command:
@@ -100,6 +131,7 @@ services:
         ipv4_address: {{ devastation_subnets.pypi_cache }}
 
   gem-cache:
+    <<: *devastation-trust
     image: {{ gem_cache_image }}
     restart: unless-stopped
     volumes:
@@ -112,6 +144,7 @@ services:
         ipv4_address: {{ devastation_subnets.gem_cache }}
 
   vault:
+    <<: *devastation-trust
     image: hashicorp/vault:{{ vault_version }}
     restart: unless-stopped
     cap_add:
@@ -130,6 +163,7 @@ services:
         ipv4_address: {{ devastation_subnets.vault }}
 
   teamcity:
+    <<: *devastation-trust
     image: {{ teamcity_image }}
     restart: unless-stopped
     ports:
@@ -142,6 +176,7 @@ services:
         ipv4_address: {{ devastation_subnets.teamcity }}
 
   eventline:
+    <<: *devastation-trust
     image: {{ goaws_image }}
     restart: unless-stopped
     ports:
@@ -151,6 +186,7 @@ services:
         ipv4_address: {{ devastation_subnets.eventline }}
 
   storage:
+    <<: *devastation-trust
     image: {{ minio_image }}
     restart: unless-stopped
     command: ["server", "/data", "--console-address", ":{{ minio_console_port }}"]
@@ -167,6 +203,7 @@ services:
         ipv4_address: {{ devastation_subnets.storage }}
 
   app-gateway:
+    <<: *devastation-trust
     image: {{ app_gateway_image }}
     restart: unless-stopped
     depends_on:
@@ -182,6 +219,7 @@ services:
         ipv4_address: {{ devastation_subnets.app_gateway }}
 
   mail:
+    <<: *devastation-trust
     image: {{ mailpit_image }}
     restart: unless-stopped
     environment:
@@ -192,6 +230,7 @@ services:
         ipv4_address: {{ devastation_subnets.mail }}
 
   iam:
+    <<: *devastation-trust
     image: {{ keycloak_image }}
     restart: unless-stopped
     command: ["start-dev", "--import-realm"]
@@ -216,6 +255,7 @@ services:
         ipv4_address: {{ devastation_subnets.iam }}
 
   keystone:
+    <<: *devastation-trust
     image: {{ keystone_image }}
     restart: unless-stopped
     environment:
@@ -233,6 +273,7 @@ services:
         ipv4_address: {{ devastation_subnets.keystone }}
 
   seaweed:
+    <<: *devastation-trust
     image: {{ seaweedfs_image }}
     restart: unless-stopped
     command:
@@ -256,6 +297,7 @@ services:
         ipv4_address: {{ devastation_subnets.seaweed }}
 
   seaweed-init:
+    <<: *devastation-trust
     image: amazon/aws-cli:2.22.35
     restart: "no"
     depends_on:
@@ -278,6 +320,7 @@ services:
       - devastation
 
   playwright:
+    <<: *devastation-trust
     image: {{ playwright_image }}
     restart: unless-stopped
     working_dir: /work
@@ -294,6 +337,7 @@ services:
         ipv4_address: {{ devastation_subnets.playwright }}
 
   www:
+    <<: *devastation-trust
     image: {{ www_image }}
     restart: unless-stopped
     logging:
@@ -313,6 +357,7 @@ services:
 
 {% for pg in postgres_databases %}
   {{ pg.service }}:
+    <<: *devastation-trust
     image: postgres:{{ postgres_version }}
     restart: unless-stopped
     stop_grace_period: {{ postgres_stop_grace_period }}
@@ -329,6 +374,7 @@ services:
         ipv4_address: {{ devastation_subnets[pg.subnet_key] }}
 
   {{ pg.service }}-exporter:
+    <<: *devastation-trust
     image: {{ postgres_exporter_image }}
     restart: unless-stopped
     environment:
@@ -341,6 +387,7 @@ services:
 {% endfor %}
 
   loki:
+    <<: *devastation-trust
     image: {{ loki_image }}
     restart: unless-stopped
     command: ["-config.file=/etc/loki/loki-config.yaml"]
@@ -354,6 +401,7 @@ services:
         ipv4_address: {{ devastation_subnets.loki }}
 
   jaeger:
+    <<: *devastation-trust
     image: {{ jaeger_image }}
     restart: unless-stopped
     ports:
@@ -363,6 +411,7 @@ services:
         ipv4_address: {{ devastation_subnets.jaeger }}
 
   otel-collector:
+    <<: *devastation-trust
     image: {{ otel_collector_image }}
     restart: unless-stopped
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
@@ -380,6 +429,7 @@ services:
         ipv4_address: {{ devastation_subnets.otel_collector }}
 
   prometheus:
+    <<: *devastation-trust
     image: {{ prometheus_image }}
     restart: unless-stopped
     command:
@@ -397,6 +447,7 @@ services:
         ipv4_address: {{ devastation_subnets.prometheus }}
 
   grafana:
+    <<: *devastation-trust
     image: {{ grafana_image }}
     restart: unless-stopped
     environment:
@@ -421,6 +472,7 @@ services:
         ipv4_address: {{ devastation_subnets.grafana }}
 
   node-exporter:
+    <<: *devastation-trust
     image: {{ node_exporter_image }}
     restart: unless-stopped
     command:
@@ -440,6 +492,7 @@ services:
         ipv4_address: {{ devastation_subnets.node_exporter }}
 
   cadvisor:
+    <<: *devastation-trust
     image: {{ cadvisor_image }}
     restart: unless-stopped
     privileged: true
@@ -454,6 +507,7 @@ services:
         ipv4_address: {{ devastation_subnets.cadvisor }}
 
   gitlab:
+    <<: *devastation-trust
     image: gitlab/gitlab-ce:{{ gitlab_version }}
     restart: unless-stopped
     stop_grace_period: {{ gitlab_stop_grace_period }}
@@ -481,6 +535,7 @@ services:
         ipv4_address: {{ devastation_subnets.gitlab }}
 
   gitlab-runner:
+    <<: *devastation-trust
     image: gitlab/gitlab-runner:{{ gitlab_runner_version }}
     restart: unless-stopped
     volumes:
@@ -501,3 +556,7 @@ networks:
       config:
         - subnet: {{ devastation_subnets.services }}
           gateway: {{ devastation_subnets.service_gateway }}
+
+configs:
+  devastation-ca-bundle:
+    file: {{ devastation_paths.workload_trust }}/ca-certificates.crt
