@@ -174,3 +174,5 @@
     - name: Apply validation role
       ansible.builtin.import_role:
         name: validation
+      environment:
+        KUBECONFIG: "{{ kind_user_kubeconfig }}"
