@@ -26,3 +26,93 @@
         + (postgres_databases | map(attribute='service') | map('regex_replace', '$', '-exporter') | list)
       }}
     state: present
+
+- name: Wait for the Datawires database
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --file
+      - "{{ devastation_paths.compose }}/compose.yml"
+      - exec
+      - --no-TTY
+      - "{{ datawires_database_service }}"
+      - pg_isready
+      - --username
+      - "{{ postgres_default_user }}"
+      - --dbname
+      - "{{ datawires_database_name }}"
+  register: datawires_database_ready
+  changed_when: false
+  retries: 30
+  delay: 2
+  until: datawires_database_ready.rc == 0
+
+- name: Check the declared Datawires database credentials
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --file
+      - "{{ devastation_paths.compose }}/compose.yml"
+      - exec
+      - --no-TTY
+      - --env
+      - "PGPASSWORD={{ datawires_database_password }}"
+      - "{{ datawires_database_service }}"
+      - psql
+      - --host
+      - 127.0.0.1
+      - --username
+      - "{{ datawires_database_user }}"
+      - --dbname
+      - "{{ datawires_database_name }}"
+      - --command
+      - SELECT 1
+  register: datawires_database_credentials
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Converge the Datawires database role credentials
+  ansible.builtin.shell: |
+    set -euo pipefail
+    docker compose --file "{{ devastation_paths.compose }}/compose.yml" \
+      exec --no-TTY "{{ datawires_database_service }}" \
+      psql --username "{{ postgres_default_user }}" --dbname "{{ datawires_database_name }}" \
+      --set ON_ERROR_STOP=1 <<'SQL'
+    DO $do$
+    BEGIN
+      IF EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '{{ datawires_database_user }}') THEN
+        ALTER ROLE {{ datawires_database_user }} WITH LOGIN PASSWORD '{{ datawires_database_password | replace("'", "''") }}';
+      ELSE
+        CREATE ROLE {{ datawires_database_user }} WITH LOGIN PASSWORD '{{ datawires_database_password | replace("'", "''") }}';
+      END IF;
+    END
+    $do$;
+    SQL
+  args:
+    executable: /bin/bash
+  when: datawires_database_credentials.rc != 0
+  no_log: true
+
+- name: Converge Datawires database ownership
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --file
+      - "{{ devastation_paths.compose }}/compose.yml"
+      - exec
+      - --no-TTY
+      - "{{ datawires_database_service }}"
+      - psql
+      - --username
+      - "{{ postgres_default_user }}"
+      - --dbname
+      - "{{ datawires_database_name }}"
+      - --set
+      - ON_ERROR_STOP=1
+      - --command
+      - "ALTER DATABASE {{ datawires_database_name }} OWNER TO {{ datawires_database_user }}"
+  changed_when: false

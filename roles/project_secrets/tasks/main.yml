@@ -33,14 +33,14 @@
     body:
       data:
         SECRET_KEY_BASE: "{{ datawires_secret_key_base }}"
-        DATAWIRES_DATABASE_PASSWORD: "{{ postgres_default_password }}"
+        DATAWIRES_DATABASE_PASSWORD: "{{ datawires_database_password }}"
     status_code:
       - 200
       - 204
   when: >-
     datawires_vault_secret.status == 404
     or (datawires_vault_secret.json.data.data.SECRET_KEY_BASE | default('')) == ''
-    or (datawires_vault_secret.json.data.data.DATAWIRES_DATABASE_PASSWORD | default('')) != postgres_default_password
+    or (datawires_vault_secret.json.data.data.DATAWIRES_DATABASE_PASSWORD | default('')) != datawires_database_password
   no_log: true
 
 - name: Sync the Datawires Vault record into Kubernetes
@@ -49,7 +49,7 @@
     kubectl --kubeconfig "{{ kind_user_kubeconfig }}" create secret generic datawires-env \
       --namespace default \
       --from-literal=SECRET_KEY_BASE="{{ datawires_secret_key_base }}" \
-      --from-literal=DATAWIRES_DATABASE_PASSWORD="{{ postgres_default_password }}" \
+      --from-literal=DATAWIRES_DATABASE_PASSWORD="{{ datawires_database_password }}" \
       --dry-run=client \
       --output=yaml \
     | kubectl --kubeconfig "{{ kind_user_kubeconfig }}" apply --filename -

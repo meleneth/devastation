@@ -503,6 +503,10 @@ vault_cli_install_enabled: true
 vault_cli_archive: /tmp/devastation-vault_{{ vault_version }}_linux_amd64.zip
 vault_cli_release_url: https://releases.hashicorp.com/vault/{{ vault_version }}/vault_{{ vault_version }}_linux_amd64.zip
 vault_project_secret_path: secret/data/projects
+datawires_database_service: production-db
+datawires_database_name: production_db
+datawires_database_user: datawires
+datawires_database_password: "{{ postgres_default_password }}"
 teamcity_image: jetbrains/teamcity-server:latest
 teamcity_port: 8111
 teamcity_container_uid: "1000"
