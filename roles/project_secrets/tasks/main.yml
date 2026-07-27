@@ -1,0 +1,61 @@
+---
+- name: Read existing Datawires project secrets from Vault
+  ansible.builtin.uri:
+    url: "http://vault.{{ devastation_domain }}:{{ vault_port }}/v1/{{ vault_project_secret_path }}/datawires"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ vault_dev_root_token }}"
+    return_content: true
+    status_code:
+      - 200
+      - 404
+  register: datawires_vault_secret
+  no_log: true
+
+- name: Preserve or generate the Datawires secret key base
+  ansible.builtin.set_fact:
+    datawires_secret_key_base: >-
+      {{
+        datawires_vault_secret.json.data.data.SECRET_KEY_BASE
+        | default(lookup('ansible.builtin.pipe', 'openssl rand -hex 64'), true)
+        if datawires_vault_secret.status == 200
+        else lookup('ansible.builtin.pipe', 'openssl rand -hex 64')
+      }}
+  no_log: true
+
+- name: Seed the Datawires project secret in Vault
+  ansible.builtin.uri:
+    url: "http://vault.{{ devastation_domain }}:{{ vault_port }}/v1/{{ vault_project_secret_path }}/datawires"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_dev_root_token }}"
+    body_format: json
+    body:
+      data:
+        SECRET_KEY_BASE: "{{ datawires_secret_key_base }}"
+        DATAWIRES_DATABASE_PASSWORD: "{{ postgres_default_password }}"
+    status_code:
+      - 200
+      - 204
+  when: >-
+    datawires_vault_secret.status == 404
+    or (datawires_vault_secret.json.data.data.SECRET_KEY_BASE | default('')) == ''
+    or (datawires_vault_secret.json.data.data.DATAWIRES_DATABASE_PASSWORD | default('')) != postgres_default_password
+  no_log: true
+
+- name: Sync the Datawires Vault record into Kubernetes
+  ansible.builtin.shell: |
+    set -euo pipefail
+    kubectl --kubeconfig "{{ kind_user_kubeconfig }}" create secret generic datawires-env \
+      --namespace default \
+      --from-literal=SECRET_KEY_BASE="{{ datawires_secret_key_base }}" \
+      --from-literal=DATAWIRES_DATABASE_PASSWORD="{{ postgres_default_password }}" \
+      --dry-run=client \
+      --output=yaml \
+    | kubectl --kubeconfig "{{ kind_user_kubeconfig }}" apply --filename -
+  args:
+    executable: /bin/bash
+  register: datawires_kubernetes_secret
+  changed_when:
+    - "'created' in datawires_kubernetes_secret.stdout or 'configured' in datawires_kubernetes_secret.stdout"
+  no_log: true

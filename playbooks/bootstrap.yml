@@ -133,6 +133,10 @@
       environment:
         KUBECONFIG: "{{ kind_user_kubeconfig }}"
 
+    - name: Seed and sync project secrets
+      ansible.builtin.import_role:
+        name: project_secrets
+
     - name: Apply datastore role
       ansible.builtin.import_role:
         name: datastores
