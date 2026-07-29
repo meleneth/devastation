@@ -442,6 +442,21 @@ trivy_version: 0.70.0
 ghostty_install_enabled: true
 ghostty_community_deb_enabled: true
 ghostty_community_release_api: https://api.github.com/repos/mkasberg/ghostty-ubuntu/releases/latest
+discord_install_enabled: true
+discord_deb_url: "https://discord.com/api/download?platform=linux&format=deb"
+discord_deb_archive: /tmp/devastation-discord.deb
+official_creative_apps_enabled: true
+official_appimage_install_root: /opt
+official_appimage_desktop_directory: /usr/local/share/applications
+obs_studio_install_enabled: "{{ official_creative_apps_enabled }}"
+obs_studio_release_api: https://api.github.com/repos/obsproject/obs-studio/releases/latest
+obs_studio_ubuntu_release: "24.04"
+gimp_install_enabled: "{{ official_creative_apps_enabled }}"
+gimp_download_page_url: https://www.gimp.org/downloads/
+krita_install_enabled: "{{ official_creative_apps_enabled }}"
+krita_release_base_url: https://download.kde.org/stable/krita
+inkscape_install_enabled: "{{ official_creative_apps_enabled }}"
+inkscape_homepage_url: https://inkscape.org/
 blender_install_enabled: true
 blender_remove_distro_package: true
 blender_official_release_base_url: https://download.blender.org/release

@@ -1,0 +1,4 @@
+# apt-cacher-ng can corrupt changing InRelease files when a client cancels a
+# conditional request and a later request resumes the cached partial response.
+# Stream signed release metadata instead; package payloads remain cached.
+DontCacheResolved: .*InRelease

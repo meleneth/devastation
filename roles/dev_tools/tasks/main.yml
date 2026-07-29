@@ -109,6 +109,160 @@
     deb: "/tmp/trivy_{{ trivy_version }}_Linux-64bit.deb"
   when: not trivy_binary.stat.exists
 
+- name: Assert official creative application architecture support
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture == "x86_64"
+    fail_msg: "Official creative application installers currently support x86_64 hosts only."
+  when: official_creative_apps_enabled | bool
+
+- name: Install AppImage runtime support
+  ansible.builtin.apt:
+    name: libfuse2t64
+    state: present
+    lock_timeout: "{{ apt_lock_timeout | int }}"
+  when: official_creative_apps_enabled | bool
+
+- name: Resolve latest official OBS Studio Ubuntu package
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      release="$(curl -fsSL {{ obs_studio_release_api | quote }})"
+      version="$(jq -r '.tag_name' <<<"$release")"
+      asset="OBS-Studio-${version}-Ubuntu-{{ obs_studio_ubuntu_release }}-x86_64.deb"
+      url="$(jq -r --arg asset "$asset" '.assets[] | select(.name == $asset) | .browser_download_url' <<<"$release")"
+      if [[ -z "$version" || "$version" == "null" || -z "$url" || "$url" == "null" ]]; then
+        echo "Unable to resolve the official OBS Studio ${asset}" >&2
+        exit 1
+      fi
+      printf '%s\n%s\n' "$version" "$url"
+  args:
+    executable: /bin/bash
+  register: obs_studio_latest_release
+  changed_when: false
+  when: obs_studio_install_enabled | bool
+
+- name: Download latest official OBS Studio package
+  ansible.builtin.get_url:
+    url: "{{ obs_studio_latest_release.stdout_lines[1] }}"
+    dest: "/tmp/OBS-Studio-{{ obs_studio_latest_release.stdout_lines[0] }}-Ubuntu-{{ obs_studio_ubuntu_release }}-x86_64.deb"
+    mode: "0644"
+  when: obs_studio_install_enabled | bool
+
+- name: Install latest official OBS Studio package
+  ansible.builtin.apt:
+    deb: "/tmp/OBS-Studio-{{ obs_studio_latest_release.stdout_lines[0] }}-Ubuntu-{{ obs_studio_ubuntu_release }}-x86_64.deb"
+    lock_timeout: "{{ apt_lock_timeout | int }}"
+  when: obs_studio_install_enabled | bool
+
+- name: Resolve latest official GIMP x86_64 AppImage
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      downloads="$(curl -fsSL {{ gimp_download_page_url | quote }})"
+      url="$(
+        grep -m 1 -oP '(?<=href="//)download\.gimp\.org/[^"]+-x86_64\.AppImage(?=")' <<<"$downloads"
+      )"
+      version="$(sed -E 's#^.*/GIMP-([0-9.]+)-x86_64\.AppImage$#\1#' <<<"$url")"
+      if [[ -z "$url" || "$version" == "$url" ]]; then
+        echo "Unable to resolve the latest official GIMP x86_64 AppImage" >&2
+        exit 1
+      fi
+      printf '%s\nhttps://%s\n' "$version" "$url"
+  args:
+    executable: /bin/bash
+  register: gimp_latest_release
+  changed_when: false
+  when: gimp_install_enabled | bool
+
+- name: Resolve latest official Krita x86_64 AppImage
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      base="{{ krita_release_base_url }}"
+      base="${base%/}"
+      releases="$(curl -fsSL "${base}/")"
+      version="$(
+        grep -oP 'href="\K[0-9]+(\.[0-9]+)+(?=/")' <<<"$releases" \
+          | sort -Vu \
+          | tail -n 1
+      )"
+      release_files="$(curl -fsSL "${base}/${version}/")"
+      archive="$(
+        grep -oP 'href="\Kkrita-[^"]+-x86_64\.AppImage(?=")' <<<"$release_files" \
+          | sort -u
+      )"
+      if [[ -z "$version" || -z "$archive" ]]; then
+        echo "Unable to resolve the latest official Krita x86_64 AppImage" >&2
+        exit 1
+      fi
+      printf '%s\n%s/%s/%s\n' "$version" "$base" "$version" "$archive"
+  args:
+    executable: /bin/bash
+  register: krita_latest_release
+  changed_when: false
+  when: krita_install_enabled | bool
+
+- name: Resolve latest official Inkscape x86_64 AppImage
+  ansible.builtin.shell:
+    cmd: |
+      set -euo pipefail
+      home="{{ inkscape_homepage_url }}"
+      home="${home%/}"
+      homepage="$(curl -fsSL "${home}/")"
+      version="$(
+        grep -oP '/release/inkscape-\K[0-9]+(\.[0-9]+)+(?=/)' <<<"$homepage" \
+          | sort -Vu \
+          | tail -n 1
+      )"
+      page="${home}/release/inkscape-${version}/gnulinux/appimage/dl/"
+      downloads="$(curl -fsSL "$page")"
+      artifact="$(
+        grep -m 1 -oP '/gallery/item/[0-9]+/[^"]+\.AppImage' <<<"$downloads"
+      )"
+      if [[ -z "$version" || -z "$artifact" ]]; then
+        echo "Unable to resolve the latest official Inkscape x86_64 AppImage" >&2
+        exit 1
+      fi
+      printf '%s\n%s%s\n' "$version" "$home" "$artifact"
+  args:
+    executable: /bin/bash
+  register: inkscape_latest_release
+  changed_when: false
+  when: inkscape_install_enabled | bool
+
+- name: Install latest official creative application AppImages
+  ansible.builtin.include_tasks: install_official_appimage.yml
+  loop:
+    - name: GIMP
+      slug: gimp
+      command: gimp
+      version: "{{ gimp_latest_release.stdout_lines[0] }}"
+      url: "{{ gimp_latest_release.stdout_lines[1] }}"
+      comment: Create and edit raster images
+      categories: Graphics;2DGraphics;RasterGraphics;
+      enabled: "{{ gimp_install_enabled }}"
+    - name: Krita
+      slug: krita
+      command: krita
+      version: "{{ krita_latest_release.stdout_lines[0] }}"
+      url: "{{ krita_latest_release.stdout_lines[1] }}"
+      comment: Digital painting and illustration
+      categories: Graphics;2DGraphics;RasterGraphics;
+      enabled: "{{ krita_install_enabled }}"
+    - name: Inkscape
+      slug: inkscape
+      command: inkscape
+      version: "{{ inkscape_latest_release.stdout_lines[0] }}"
+      url: "{{ inkscape_latest_release.stdout_lines[1] }}"
+      comment: Create and edit scalable vector graphics
+      categories: Graphics;2DGraphics;VectorGraphics;
+      enabled: "{{ inkscape_install_enabled }}"
+  loop_control:
+    loop_var: official_appimage
+    label: "{{ official_appimage.name }}"
+  when: official_appimage.enabled | bool
+
 - name: Remove distro Blender package
   ansible.builtin.apt:
     name: blender
@@ -360,3 +514,17 @@
     - ghostty_install_enabled
     - ghostty_community_deb_enabled
     - ghostty_community_deb_url.stdout | default('') | length > 0
+
+- name: Download official Discord Debian package
+  ansible.builtin.get_url:
+    url: "{{ discord_deb_url }}"
+    dest: "{{ discord_deb_archive }}"
+    mode: "0644"
+    force: true
+  when: discord_install_enabled | bool
+
+- name: Install official Discord Debian package
+  ansible.builtin.apt:
+    deb: "{{ discord_deb_archive }}"
+    lock_timeout: "{{ apt_lock_timeout | int }}"
+  when: discord_install_enabled | bool

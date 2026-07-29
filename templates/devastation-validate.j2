@@ -130,6 +130,18 @@ check "Helm installed" helm version --short || status=1
 check "k9s installed" k9s version || status=1
 check "lazydocker installed" lazydocker --version || status=1
 check "trivy installed" trivy --version || status=1
+{% if obs_studio_install_enabled %}
+check "OBS Studio official installed" obs --version || status=1
+{% endif %}
+{% if gimp_install_enabled %}
+check "GIMP official AppImage installed" gimp --version || status=1
+{% endif %}
+{% if krita_install_enabled %}
+check "Krita official AppImage installed" krita --version || status=1
+{% endif %}
+{% if inkscape_install_enabled %}
+check "Inkscape official AppImage installed" inkscape --version || status=1
+{% endif %}
 {% if desktop_notifications_enabled %}
 check "dunst installed" dunst --version || status=1
 check "notify-send installed" notify-send --version || status=1

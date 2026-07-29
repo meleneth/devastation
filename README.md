@@ -38,7 +38,7 @@ The current feature set includes:
 - Explicit image mirroring into the private registry for required images hosted outside Docker Hub
 - Package caching for apt, npm, PyPI, and RubyGems
 - KIND with local registry trust, cert-manager, Istio, Argo CD, and the OpenTelemetry Operator
-- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, latest official Blender, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, goenv, rustup, and MesloLGS Nerd Font
+- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, the latest official OBS Studio, GIMP, Blender, Krita, and Inkscape releases, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, goenv, rustup, and MesloLGS Nerd Font
 - GitLab CE and a Docker-executor GitLab Runner
 - Vault dev server, Eventline GoAWS SNS/SQS emulator, MinIO object storage, SeaweedFS S3 object storage, Mailpit, Keycloak, Keystone, Playwright, and Postgres containers
 - Prometheus, Grafana, Loki, Jaeger v2, OpenTelemetry Collector, node-exporter, cAdvisor, registry metrics, and Postgres exporters
@@ -97,6 +97,10 @@ The `fonts` role installs the patched MesloLGS Nerd Font files from `romkatv/pow
 The `neovim` role installs the latest official upstream Linux x86_64 Neovim release from GitHub, links it at `/usr/local/bin/nvim`, and removes the old distro `neovim` package by default. It installs LazyVim from the official starter repo only when no user config exists. If the previous generated minimal devastation config is present, it is moved aside to a timestamped backup before LazyVim is installed.
 
 The `dev_tools` role installs Ghostty when `ghostty_install_enabled: true`. It uses an existing `ghostty` apt package when available, then falls back to the community-maintained Debian/Ubuntu `.deb` package when `ghostty_community_deb_enabled: true`.
+
+The `dev_tools` role installs the official Discord Debian package when `discord_install_enabled: true`. Set `discord_deb_url` to pin or mirror a package instead of using Discord's current Linux download endpoint.
+
+When `official_creative_apps_enabled: true`, the `dev_tools` role resolves and installs the newest stable upstream x86_64 releases on every convergence. OBS Studio uses the official OBS Project Ubuntu 24.04 Debian package. GIMP, Krita, and Inkscape use their projects' official AppImages under `/opt`, with commands in `/usr/local/bin` and launchers in `/usr/local/share/applications`. No Flatpak, Flathub, Snap, or Debian repository versions are used for these applications.
 
 The `dev_tools` role removes the distro `blender` package when `blender_remove_distro_package: true`, resolves the newest official Linux x64 Blender release from `download.blender.org` each run, installs it under `/opt/blender/current`, and links it at `/usr/local/bin/blender`.
 
@@ -276,6 +280,10 @@ Acquire::http::Proxy "http://apt-cache.deva.station:3142";
 Acquire::https::Proxy "DIRECT";
 ```
 
+Signed `InRelease` metadata is streamed without being cached. This avoids an
+apt-cacher-ng conditional-request bug that can combine current repository data
+with a stale signature; package indexes and package payloads remain cached.
+
 The Debian trixie sources on the local host should use `http://deb.debian.org/debian/` and `http://security.debian.org/debian-security` to be cached. Third-party HTTPS repositories such as Docker, VS Code, or Chrome intentionally go direct because HTTPS apt bodies cannot be transparently cached by apt-cacher-ng.
 
 Docker and KIND DNS also redirect the standard Debian and Ubuntu HTTP archive
@@ -423,7 +431,7 @@ MinIO is pinned to a known community image tag because current MinIO community i
 
 The host toolchain includes Helm, kubectl, K9s, Lazydocker, and Trivy. The KIND cluster is configured with the local registry trust and is bootstrapped with cert-manager, Istio, Argo CD, and the OpenTelemetry Operator when `kind_install_platform_addons` is enabled. By default, the KIND kubeconfig is exported to the target user's `~/.kube/config`, so `kubectl` and `k9s` use the `devastation` cluster without extra environment variables.
 
-Default versions are pinned in `group_vars/all.yml`: KIND `v0.23.0`, kubectl `v1.30.2`, node image `kindest/node:v1.30.0`, Helm `v4.2.0`, K9s `v0.50.18`, Lazydocker `0.25.0`, Trivy `0.70.0`, Istio `1.30.0`, Argo CD `v3.4.2`, and OpenTelemetry Operator `v0.151.0`. Ghostty uses the available apt package or the latest supported community Debian/Ubuntu package. Blender deliberately is not pinned; it resolves the latest official Linux x64 release during convergence.
+Default versions are pinned in `group_vars/all.yml`: KIND `v0.23.0`, kubectl `v1.30.2`, node image `kindest/node:v1.30.0`, Helm `v4.2.0`, K9s `v0.50.18`, Lazydocker `0.25.0`, Trivy `0.70.0`, Istio `1.30.0`, Argo CD `v3.4.2`, and OpenTelemetry Operator `v0.151.0`. Ghostty uses the available apt package or the latest supported community Debian/Ubuntu package. OBS Studio, GIMP, Blender, Krita, and Inkscape deliberately are not pinned; they resolve the latest official stable x86_64 releases during convergence.
 
 ## GitLab
 

@@ -16,6 +16,14 @@
     mode: "0644"
   when: apt_cache_transparent_enabled | bool
 
+- name: Configure apt cache safety overrides
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/apt-cache-devastation.conf.j2"
+    dest: "{{ devastation_paths.apt_cache }}/devastation.conf"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Start apt cache service
   community.docker.docker_compose_v2:
     project_src: "{{ devastation_paths.compose }}"

@@ -77,6 +77,7 @@ services:
 {% endfor %}
     volumes:
       - {{ devastation_paths.apt_cache }}/data:/var/cache/apt-cacher-ng
+      - {{ devastation_paths.apt_cache }}/devastation.conf:/etc/apt-cacher-ng/devastation.conf:ro
     ports:
       - "{{ apt_cache_port }}:3142"
     networks:

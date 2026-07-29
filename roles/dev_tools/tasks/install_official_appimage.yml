@@ -1,0 +1,75 @@
+---
+- name: "Create {{ official_appimage.name }} install directory"
+  ansible.builtin.file:
+    path: "{{ official_appimage_install_root }}/{{ official_appimage.slug }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create official application desktop entry directory
+  ansible.builtin.file:
+    path: "{{ official_appimage_desktop_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: "Read installed {{ official_appimage.name }} version marker"
+  ansible.builtin.slurp:
+    src: "{{ official_appimage_install_root }}/{{ official_appimage.slug }}/VERSION"
+  register: official_appimage_version_marker
+  failed_when: false
+  changed_when: false
+
+- name: "Download official {{ official_appimage.name }} {{ official_appimage.version }} AppImage"
+  ansible.builtin.get_url:
+    url: "{{ official_appimage.url }}"
+    dest: "{{ official_appimage_install_root }}/{{ official_appimage.slug }}/{{ official_appimage.slug }}-{{ official_appimage.version }}.AppImage"
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - official_appimage_version_marker.content is not defined
+      or (official_appimage_version_marker.content | b64decode | trim) != official_appimage.version
+
+- name: "Point {{ official_appimage.name }} at the latest official AppImage"
+  ansible.builtin.file:
+    src: "{{ official_appimage_install_root }}/{{ official_appimage.slug }}/{{ official_appimage.slug }}-{{ official_appimage.version }}.AppImage"
+    dest: "{{ official_appimage_install_root }}/{{ official_appimage.slug }}/current.AppImage"
+    state: link
+    owner: root
+    group: root
+    force: true
+
+- name: "Link {{ official_appimage.name }} into PATH"
+  ansible.builtin.file:
+    src: "{{ official_appimage_install_root }}/{{ official_appimage.slug }}/current.AppImage"
+    dest: "/usr/local/bin/{{ official_appimage.command }}"
+    state: link
+    owner: root
+    group: root
+    force: true
+
+- name: "Install {{ official_appimage.name }} desktop entry"
+  ansible.builtin.copy:
+    dest: "{{ official_appimage_desktop_directory }}/{{ official_appimage.slug }}.desktop"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Desktop Entry]
+      Type=Application
+      Name={{ official_appimage.name }}
+      Comment={{ official_appimage.comment }}
+      Exec=/usr/local/bin/{{ official_appimage.command }} %F
+      Terminal=false
+      Categories={{ official_appimage.categories }}
+
+- name: "Write installed {{ official_appimage.name }} version marker"
+  ansible.builtin.copy:
+    content: "{{ official_appimage.version }}\n"
+    dest: "{{ official_appimage_install_root }}/{{ official_appimage.slug }}/VERSION"
+    owner: root
+    group: root
+    mode: "0644"
