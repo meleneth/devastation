@@ -545,6 +545,8 @@ minio_console_port: 9001
 app_gateway_image: nginx:1.27-alpine
 keycloak_upstream_image: quay.io/keycloak/keycloak:26.0
 keycloak_image: "registry.{{ devastation_domain }}/devastation-mirror/quay.io/keycloak/keycloak:26.0"
+oauth2_proxy_upstream_image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.2
+oauth2_proxy_image: "registry.{{ devastation_domain }}/devastation-mirror/quay.io/oauth2-proxy/oauth2-proxy:v7.15.2"
 keycloak_realm: devastation
 keycloak_admin_user: admin
 keycloak_admin_password: devastation-admin
@@ -601,6 +603,8 @@ postgres_exporter_image: prometheuscommunity/postgres-exporter:latest
 devastation_mirrored_images:
   - source: "{{ keycloak_upstream_image }}"
     target: "{{ keycloak_image }}"
+  - source: "{{ oauth2_proxy_upstream_image }}"
+    target: "{{ oauth2_proxy_image }}"
   - source: "{{ playwright_upstream_image }}"
     target: "{{ playwright_image }}"
   - source: "{{ jaeger_upstream_image }}"
