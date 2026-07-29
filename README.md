@@ -15,7 +15,7 @@ Persistent state defaults to `/srv/devastation`:
 - `/srv/devastation/secrets`: generated secrets, mode `0700`
 - `/srv/devastation/registry`: standalone local registry data
 - `/srv/devastation/apt-cache`: apt-cacher-ng cache data
-- `/srv/devastation/package-caches`: Verdaccio, devpi, and Gemstash cache data/configuration
+- `/srv/devastation/package-caches`: Verdaccio, devpi, Gemstash, Cargo, and Athens cache data/configuration
 - `/srv/devastation/kind`: KIND cluster config
 - `/srv/devastation/gitlab`: GitLab config, logs, and data
 - `/srv/devastation/gitlab-runner`: GitLab Runner config
@@ -121,6 +121,8 @@ These names are served under `deva.station`:
 - `npm-cache.deva.station`
 - `pypi-cache.deva.station`
 - `gem-cache.deva.station`
+- `cargo-cache.deva.station`
+- `go-cache.deva.station`
 - `gitlab.deva.station`
 - `runner.deva.station`
 - `teamcity.deva.station`
@@ -178,6 +180,8 @@ Browser-friendly local links:
 - [npm cache](http://npm-cache.deva.station:4873)
 - [PyPI cache](http://pypi-cache.deva.station:3141/root/pypi/)
 - [RubyGems cache](http://gem-cache.deva.station:9292)
+- [Cargo cache](http://cargo-cache.deva.station:8084/health)
+- [Go module cache](http://go-cache.deva.station:3002/healthz)
 - [OTel Collector metrics](http://otel-collector.deva.station:8888/metrics)
 - [OTel Collector Prometheus exporter](http://otel-collector.deva.station:9464/metrics)
 - [node-exporter metrics](http://node-exporter.deva.station:9100/metrics)
@@ -192,6 +196,8 @@ Non-browser endpoints:
 - npm registry: `http://npm-cache.deva.station:4873`
 - pip index: `http://pypi-cache.deva.station:3141/root/pypi/+simple/`
 - RubyGems source: `http://gem-cache.deva.station:9292`
+- Cargo sparse registry: `sparse+http://cargo-cache.deva.station:8084/index/`
+- Go module proxy: `http://go-cache.deva.station:3002`
 - OIDC issuer: `https://iam.deva.station/realms/devastation`
 - SMTP: `smtp.mail.deva.station:1025`
 - SeaweedFS S3 endpoint: `https://s3.deva.station`
@@ -308,6 +314,8 @@ The environment also runs local proxy caches for common language ecosystems:
 - npm: `http://npm-cache.deva.station:4873` using Verdaccio
 - Python: `http://pypi-cache.deva.station:3141/root/pypi/+simple/` using devpi
 - Ruby: `http://gem-cache.deva.station:9292` using Gemstash
+- Rust: `sparse+http://cargo-cache.deva.station:8084/index/` using an nginx-backed crates.io sparse index and crate cache
+- Go: `http://go-cache.deva.station:3002` using Athens
 
 The `user_setup` role applies these automatically by default. Use these manually in local shells or automation that has not been bootstrapped yet:
 
@@ -316,6 +324,8 @@ npm config set registry http://npm-cache.deva.station:4873
 python3 -m pip config set global.index-url http://pypi-cache.deva.station:3141/root/pypi/+simple/
 bundle config set mirror.https://rubygems.org http://gem-cache.deva.station:9292
 gem sources --add http://gem-cache.deva.station:9292 --remove https://rubygems.org/
+export CARGO_REGISTRIES_CRATES_IO_INDEX=sparse+http://cargo-cache.deva.station:8084/index/
+go env -w GOPROXY=http://go-cache.deva.station:3002,direct
 ```
 
 For one-off commands:
@@ -325,6 +335,8 @@ NPM_CONFIG_REGISTRY=http://npm-cache.deva.station:4873 npm install
 PIP_INDEX_URL=http://pypi-cache.deva.station:3141/root/pypi/+simple/ pip install requests
 bundle config set --local mirror.https://rubygems.org http://gem-cache.deva.station:9292 && bundle install
 gem install rake --source http://gem-cache.deva.station:9292
+CARGO_REGISTRIES_CRATES_IO_INDEX=sparse+http://cargo-cache.deva.station:8084/index/ cargo fetch
+GOPROXY=http://go-cache.deva.station:3002 go mod download
 ```
 
 Share [AGENTS.md](AGENTS.md) with coding agents so they use the local caches instead of going directly to public package registries.
@@ -489,7 +501,7 @@ Reset KIND only:
 Inspect logs:
 
 ```bash
-docker compose -f /srv/devastation/compose/compose.yml logs -f dns www registry registry-cache apt-cache vault teamcity eventline storage app-gateway iam mail keystone seaweed playwright test-db development-db production-db otel-db iam-db keystone-db prometheus grafana loki jaeger otel-collector node-exporter cadvisor gitlab gitlab-runner
+docker compose -f /srv/devastation/compose/compose.yml logs -f dns www registry registry-cache apt-cache npm-cache pypi-cache gem-cache cargo-cache go-cache vault teamcity eventline storage app-gateway iam mail keystone seaweed playwright test-db development-db production-db otel-db iam-db keystone-db prometheus grafana loki jaeger otel-collector node-exporter cadvisor gitlab gitlab-runner
 ```
 
 Regenerate by convergence:

@@ -92,6 +92,15 @@ check "host apt uses local HTTP proxy" bash -c "grep -Fq 'Acquire::http::Proxy \
 check "npm cache reachable" curl -fsS "http://npm-cache.${DOMAIN}:{{ npm_cache_port }}/-/ping" || status=1
 check "PyPI cache reachable" curl -fsSL "http://pypi-cache.${DOMAIN}:{{ pypi_cache_port }}/root/pypi/+simple/" || status=1
 check "RubyGems cache reachable" curl -fsS "http://gem-cache.${DOMAIN}:{{ gem_cache_port }}/" || status=1
+check "Cargo cache reachable" curl -fsS "http://cargo-cache.${DOMAIN}:{{ cargo_cache_port }}/health" || status=1
+check "Go module cache reachable" curl -fsS "http://go-cache.${DOMAIN}:{{ go_cache_port }}/healthz" || status=1
+{% if user_setup_enabled and user_setup_configure_package_mirrors %}
+check "Cargo sparse index configured" bash -c "grep -Fq '{{ user_setup_cargo_registry }}' '{{ cargo_home }}/config.toml'" || status=1
+check "npm uses local cache" bash -c "grep -Fq 'registry={{ user_setup_npm_registry }}' '{{ user_setup_home }}/.npmrc'" || status=1
+check "pip uses local cache" bash -c "grep -Fq 'index-url = {{ user_setup_pip_index_url }}' '{{ user_setup_home }}/.config/pip/pip.conf'" || status=1
+check "Bundler uses local cache" bash -c "grep -Fq '{{ user_setup_gem_source }}' '{{ user_setup_home }}/.bundle/config'" || status=1
+check "shell uses Go module cache" bash -c "grep -Fq 'GOPROXY=\"{{ user_setup_go_proxy }}\"' '{{ user_setup_shell_profile }}'" || status=1
+{% endif %}
 check "Vault reachable" curl -fsS "http://vault.${DOMAIN}:{{ vault_port }}/v1/sys/health" || status=1
 retry_check "TeamCity reachable" 48 5 curl -sS -o /dev/null "http://teamcity.${DOMAIN}:{{ teamcity_port }}/" || status=1
 check "eventline GoAWS reachable" nc -z "eventline.${DOMAIN}" {{ goaws_port }} || status=1

@@ -4,56 +4,70 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Devastation</title>
-    <script>
-      window.tailwind = window.tailwind || {};
-      window.tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              lospec: {
-                ink: "#10121c",
-                dusk: "#2c1e31",
-                wine: "#6b2643",
-                red: "#ec273f",
-                orange: "#e98537",
-                gold: "#f3a833",
-                bark: "#4d3533",
-                tan: "#dab163",
-                cream: "#f7f3b7",
-                pine: "#1e4044",
-                green: "#5ab552",
-                lime: "#9de64e",
-                teal: "#008b8b",
-                mint: "#d3eed3",
-                indigo: "#3e3b65",
-                blue: "#3388de",
-                sky: "#36c5f4",
-                cyan: "#6dead6",
-                violet: "#8c78a5",
-                lavender: "#deceed",
-                mauve: "#c878af",
-                pink: "#fa6e79",
-                blush: "#ffd1d5",
-                white: "#ffffff"
-              }
-            },
-            boxShadow: {
-              pixel: "0 0 0 2px #10121c, 6px 6px 0 0 #10121c"
-            },
-            fontFamily: {
-              pixel: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "monospace"]
-            }
-          }
-        }
-      };
-    </script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        background: #10121c;
+        color: #fff;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: #10121c; }
+      a { color: inherit; text-decoration: none; }
+      code, input { font: inherit; }
+      #app { min-height: 100vh; overflow: hidden; }
+      main { width: min(100% - 2.5rem, 80rem); min-height: 100vh; margin: auto; padding: 1.5rem 0; }
+      header { display: flex; align-items: end; justify-content: space-between; gap: 1.25rem; padding-bottom: 1.5rem; border-bottom: 4px solid #3388de; }
+      header > div:first-child > p:first-child { display: inline-block; margin: 0 0 .75rem; padding: .25rem .75rem; border: 2px solid #9de64e; background: #1e4044; color: #9de64e; font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; }
+      h1 { margin: 0; color: #f7f3b7; font-size: clamp(2.5rem, 7vw, 4.5rem); line-height: 1; text-transform: uppercase; }
+      h2 { margin: 0; font-size: 1.5rem; text-transform: uppercase; }
+      header p { max-width: 48rem; color: #d3eed3; line-height: 1.5; }
+      header a { display: inline-block; margin: .25rem .5rem .25rem 0; padding: .5rem 1rem; border: 2px solid #6dead6; background: #3e3b65; color: #6dead6; }
+      header a:first-child { border-color: #9de64e; background: #1e4044; color: #9de64e; }
+      header a:last-child { border-color: #f3a833; background: #4d3533; color: #f3a833; }
+      header > div:last-child { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; text-align: center; font-size: .75rem; text-transform: uppercase; }
+      header > div:last-child > div { padding: .5rem .75rem; border: 2px solid #6dead6; background: #3e3b65; }
+      main > section { display: grid; grid-template-columns: 16.25rem 1fr; gap: 1.5rem; padding: 2rem 0; }
+      aside > div { margin-bottom: 1.25rem; padding: 1rem; border: 4px solid #fff; background: #2c1e31; box-shadow: 6px 6px #10121c, 6px 6px 0 2px #fff; }
+      aside > div:last-child { background: #1e4044; }
+      label { display: block; margin-bottom: .5rem; color: #36c5f4; font-size: .75rem; text-transform: uppercase; }
+      input { width: 100%; padding: .5rem .75rem; border: 2px solid #fff; outline: 0; background: #10121c; color: #fff; }
+      input:focus { border-color: #9de64e; }
+      aside p { margin: 0; color: #9de64e; font-size: .75rem; text-transform: uppercase; }
+      aside p + div { display: grid; grid-template-columns: repeat(7, 1fr); gap: .25rem; margin-top: .75rem; }
+      aside span { aspect-ratio: 1; border: 1px solid #10121c; }
+      main > section > div > section { margin-bottom: 2rem; }
+      main > section > div > section > div:first-child { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: .75rem; color: #8c78a5; font-size: .75rem; text-transform: uppercase; }
+      main > section > div > section:first-child h2 { color: #36c5f4; }
+      main > section > div > section:last-child h2 { color: #f3a833; }
+      main > section > div > section > div:last-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+      main > section > div > section:first-child > div:last-child { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      main > section > div > section:first-child a { display: block; padding: 1rem; border: 4px solid #fff; background: #2c1e31; box-shadow: 6px 6px #10121c, 6px 6px 0 2px #fff; }
+      main > section > div > section:first-child a:hover { border-color: #9de64e; background: #1e4044; transform: translateY(-.25rem); }
+      main > section > div > section:last-child > div:last-child > div { padding: .75rem; border: 2px solid #dab163; background: #4d3533; }
+      section .flex { display: flex; align-items: start; justify-content: space-between; gap: .75rem; }
+      section .flex p { margin: 0; }
+      section .flex p:first-child { font-weight: 900; text-transform: uppercase; }
+      section .flex p + p { margin-top: .5rem; color: #deceed; font-size: .75rem; line-height: 1.5; }
+      section .flex span { flex: none; padding: .25rem .5rem; background: #10121c; color: #6dead6; font-size: .75rem; }
+      section a > p, section code { display: block; margin: 1rem 0 0; overflow-wrap: anywhere; color: #6dead6; font-size: .75rem; }
+      section code { padding: .5rem; background: #10121c; color: #d3eed3; }
+      @media (max-width: 64rem) {
+        header { align-items: start; flex-direction: column; }
+        main > section { grid-template-columns: 1fr; }
+        main > section > div > section:first-child > div:last-child { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (max-width: 42rem) {
+        main > section > div > section > div:last-child,
+        main > section > div > section:first-child > div:last-child { grid-template-columns: 1fr; }
+      }
+    </style>
+    <script src="/vue.global.prod.js"></script>
   </head>
   <body class="min-h-screen bg-lospec-ink text-lospec-white font-pixel antialiased">
     <div id="app" class="relative isolate min-h-screen overflow-hidden">
       <div class="pointer-events-none fixed inset-0 z-0 opacity-25" aria-hidden="true">
-        <div class="absolute inset-0" style=" linear-gradient(90deg, #2c1e31 1px, transparent 1px); background-size: 24px 24px;"></div>
+        <div class="absolute inset-0" style="background-image: linear-gradient(90deg, #2c1e31 1px, transparent 1px); background-size: 24px 24px;"></div>
       </div>
 
       <main class="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-5 py-6 sm:px-8 lg:px-10">
@@ -189,6 +203,8 @@
               { name: "npm Cache", href: "http://npm-cache.deva.station:4873", kind: "cache", description: "Verdaccio npm proxy and private package registry." },
               { name: "PyPI Cache", href: "http://pypi-cache.deva.station:3141/root/pypi/", kind: "cache", description: "devpi Python package index and PyPI cache." },
               { name: "RubyGems Cache", href: "http://gem-cache.deva.station:9292", kind: "cache", description: "Gemstash RubyGems proxy and private gem source." },
+              { name: "Cargo Cache", href: "http://cargo-cache.deva.station:8084/health", kind: "cache", description: "Cached crates.io sparse index and crate downloads." },
+              { name: "Go Module Cache", href: "http://go-cache.deva.station:3002/healthz", kind: "cache", description: "Athens Go module proxy cache." },
               { name: "OTel Metrics", href: "http://otel-collector.deva.station:8888/metrics", kind: "otel", description: "OpenTelemetry Collector internal metrics." },
               { name: "OTel Prom Exporter", href: "http://otel-collector.deva.station:9464/metrics", kind: "otel", description: "Collector Prometheus exporter endpoint." },
               { name: "node-exporter", href: "http://node-exporter.deva.station:9100/metrics", kind: "host", description: "Host metrics exposed for Prometheus." },
@@ -202,6 +218,8 @@
               { name: "npm registry", value: "http://npm-cache.deva.station:4873", kind: "npm", description: "Use with npm, pnpm, Yarn, and Corepack registry settings." },
               { name: "pip index", value: "http://pypi-cache.deva.station:3141/root/pypi/+simple/", kind: "python", description: "Use as pip index-url for cached PyPI packages." },
               { name: "RubyGems source", value: "http://gem-cache.deva.station:9292", kind: "ruby", description: "Use as a gem source or Bundler mirror for rubygems.org." },
+              { name: "Cargo registry", value: "sparse+http://cargo-cache.deva.station:8084/index/", kind: "rust", description: "Use as the crates.io source replacement for cached Rust crates." },
+              { name: "Go proxy", value: "http://go-cache.deva.station:3002,direct", kind: "go", description: "Use as GOPROXY for cached Go modules with a direct fallback." },
               { name: "OIDC issuer", value: "https://iam.deva.station/realms/devastation", kind: "auth", description: "Issuer URL for Rails, Rack, Node, and browser OIDC clients." },
               { name: "OIDC demo client", value: "devastation-demo / devastation-demo-secret", kind: "auth", description: "Local-only confidential OIDC client credentials." },
               { name: "SMTP", value: "smtp.mail.deva.station:1025", kind: "mail", description: "Mailpit SMTP endpoint for generated apps." },

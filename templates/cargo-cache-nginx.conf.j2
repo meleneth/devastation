@@ -1,0 +1,39 @@
+proxy_cache_path /var/cache/nginx/crates levels=1:2 keys_zone=crates:20m
+                 max_size=20g inactive=365d use_temp_path=off;
+
+server {
+    listen {{ cargo_cache_port }};
+    server_name _;
+    resolver {{ dns_upstream_resolvers | join(' ') }} ipv6=off;
+
+    location = /health {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    location = /index/config.json {
+        default_type application/json;
+        return 200 '{"dl":"http://cargo-cache.{{ devastation_domain }}:{{ cargo_cache_port }}/crates","api":"https://crates.io"}';
+    }
+
+    location ~ ^/index/(.*)$ {
+        set $index_upstream index.crates.io;
+        proxy_set_header Host index.crates.io;
+        proxy_ssl_server_name on;
+        proxy_pass https://$index_upstream/$1;
+        proxy_cache crates;
+        proxy_cache_valid 200 1h;
+        proxy_cache_valid 404 1m;
+        add_header X-Devastation-Cache $upstream_cache_status always;
+    }
+
+    location ~ ^/crates/([^/]+)/([^/]+)/download$ {
+        set $crate_upstream static.crates.io;
+        proxy_set_header Host static.crates.io;
+        proxy_ssl_server_name on;
+        proxy_pass https://$crate_upstream/crates/$1/$1-$2.crate;
+        proxy_cache crates;
+        proxy_cache_valid 200 365d;
+        add_header X-Devastation-Cache $upstream_cache_status always;
+    }
+}

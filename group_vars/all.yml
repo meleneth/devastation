@@ -17,6 +17,8 @@ devastation_subnets:
   npm_cache: 172.30.42.28
   pypi_cache: 172.30.42.29
   gem_cache: 172.30.42.30
+  cargo_cache: 172.30.42.47
+  go_cache: 172.30.42.48
   otel_collector: 172.30.42.17
   prometheus: 172.30.42.18
   jaeger: 172.30.42.19
@@ -42,6 +44,7 @@ devastation_subnets:
   seaweed: 172.30.42.43
   playwright: 172.30.42.44
   apt_cache_transparent: 172.30.42.45
+  kitten_analysts: 172.30.42.46
 
 devastation_dns_records:
   - name: "{{ devastation_domain }}"
@@ -62,6 +65,10 @@ devastation_dns_records:
     ip: "{{ devastation_subnets.pypi_cache }}"
   - name: "gem-cache.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.gem_cache }}"
+  - name: "cargo-cache.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.cargo_cache }}"
+  - name: "go-cache.{{ devastation_domain }}"
+    ip: "{{ devastation_subnets.go_cache }}"
   - name: "gitlab.{{ devastation_domain }}"
     ip: "{{ devastation_subnets.gitlab }}"
   - name: "runner.{{ devastation_domain }}"
@@ -127,6 +134,8 @@ devastation_internal_hostnames:
   - "npm-cache.{{ devastation_domain }}"
   - "pypi-cache.{{ devastation_domain }}"
   - "gem-cache.{{ devastation_domain }}"
+  - "cargo-cache.{{ devastation_domain }}"
+  - "go-cache.{{ devastation_domain }}"
   - "gitlab.{{ devastation_domain }}"
   - "runner.{{ devastation_domain }}"
   - "teamcity.{{ devastation_domain }}"
@@ -235,6 +244,8 @@ user_setup_configure_package_mirrors: true
 user_setup_npm_registry: "http://npm-cache.{{ devastation_domain }}:{{ npm_cache_port }}"
 user_setup_pip_index_url: "http://pypi-cache.{{ devastation_domain }}:{{ pypi_cache_port }}/root/pypi/+simple/"
 user_setup_gem_source: "http://gem-cache.{{ devastation_domain }}:{{ gem_cache_port }}"
+user_setup_cargo_registry: "sparse+http://cargo-cache.{{ devastation_domain }}:{{ cargo_cache_port }}/index/"
+user_setup_go_proxy: "http://go-cache.{{ devastation_domain }}:{{ go_cache_port }},direct"
 desktop_notifications_enabled: true
 desktop_notification_packages:
   - dunst
@@ -404,6 +415,19 @@ gem_cache_prefetch_packages:
   - bundler
   - rake
 
+cargo_cache_image: nginx:1.27-alpine
+cargo_cache_port: 8084
+cargo_cache_prefetch_crates:
+  - serde
+  - tokio
+  - clap
+
+go_cache_image: gomods/athens:v0.17.1
+go_cache_port: 3002
+go_cache_prefetch_modules:
+  - golang.org/x/tools@latest
+  - github.com/spf13/cobra@latest
+
 kind_cluster_name: devastation
 kind_version: v0.23.0
 kubectl_version: v1.30.2
@@ -556,6 +580,10 @@ grafana_port: 3000
 prometheus_image: prom/prometheus:latest
 prometheus_port: 9090
 prometheus_retention: 15d
+kitten_analysts_image: ghcr.io/kitten-science/kitten-analysts:v0.0.19
+kitten_analysts_http_port: 7780
+kitten_analysts_metrics_port: 9091
+kitten_analysts_websocket_port: 9093
 loki_image: grafana/loki:3.6.0
 loki_port: 3100
 otel_collector_image: otel/opentelemetry-collector-contrib:0.153.0

@@ -10,6 +10,8 @@ This repository is designed to run inside the `devastation` local environment. P
 - npm registry: `http://npm-cache.deva.station:4873`
 - Python package index: `http://pypi-cache.deva.station:3141/root/pypi/+simple/`
 - RubyGems source: `http://gem-cache.deva.station:9292`
+- Cargo sparse registry: `sparse+http://cargo-cache.deva.station:8084/index/`
+- Go module proxy: `http://go-cache.deva.station:3002`
 
 ## Client Configuration
 
@@ -20,6 +22,8 @@ npm config set registry http://npm-cache.deva.station:4873
 python3 -m pip config set global.index-url http://pypi-cache.deva.station:3141/root/pypi/+simple/
 bundle config set mirror.https://rubygems.org http://gem-cache.deva.station:9292
 gem sources --add http://gem-cache.deva.station:9292 --remove https://rubygems.org/
+export CARGO_REGISTRIES_CRATES_IO_INDEX=sparse+http://cargo-cache.deva.station:8084/index/
+go env -w GOPROXY=http://go-cache.deva.station:3002,direct
 ```
 
 For Dockerfiles that run apt:
@@ -36,6 +40,8 @@ NPM_CONFIG_REGISTRY=http://npm-cache.deva.station:4873 npm install
 PIP_INDEX_URL=http://pypi-cache.deva.station:3141/root/pypi/+simple/ pip install -r requirements.txt
 bundle config set --local mirror.https://rubygems.org http://gem-cache.deva.station:9292 && bundle install
 gem install rake --source http://gem-cache.deva.station:9292
+CARGO_REGISTRIES_CRATES_IO_INDEX=sparse+http://cargo-cache.deva.station:8084/index/ cargo fetch
+GOPROXY=http://go-cache.deva.station:3002 go mod download
 ```
 
 The caches are transparent proxies. They still need upstream internet the first time a package is fetched, then serve cached artifacts from `/srv/devastation` on later runs.

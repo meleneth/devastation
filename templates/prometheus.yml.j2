@@ -25,6 +25,10 @@ scrape_configs:
     static_configs:
       - targets: ["grafana:3000"]
 
+  - job_name: kitten-analysts
+    static_configs:
+      - targets: ["kitten-analysts:9091"]
+
   - job_name: loki
     static_configs:
       - targets: ["loki:3100"]

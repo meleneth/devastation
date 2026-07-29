@@ -143,6 +143,35 @@ services:
       devastation:
         ipv4_address: {{ devastation_subnets.gem_cache }}
 
+  cargo-cache:
+    <<: *devastation-trust
+    image: {{ cargo_cache_image }}
+    restart: unless-stopped
+    volumes:
+      - {{ devastation_paths.package_caches }}/cargo/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - {{ devastation_paths.package_caches }}/cargo/data:/var/cache/nginx
+    ports:
+      - "{{ cargo_cache_port }}:{{ cargo_cache_port }}"
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.cargo_cache }}
+
+  go-cache:
+    <<: *devastation-trust
+    image: {{ go_cache_image }}
+    restart: unless-stopped
+    environment:
+      ATHENS_DISK_STORAGE_ROOT: /var/lib/athens
+      ATHENS_STORAGE_TYPE: disk
+      ATHENS_PORT: ":{{ go_cache_port }}"
+    volumes:
+      - {{ devastation_paths.package_caches }}/athens/data:/var/lib/athens
+    ports:
+      - "{{ go_cache_port }}:{{ go_cache_port }}"
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.go_cache }}
+
   vault:
     <<: *devastation-trust
     image: hashicorp/vault:{{ vault_version }}
@@ -445,6 +474,19 @@ services:
     networks:
       devastation:
         ipv4_address: {{ devastation_subnets.prometheus }}
+
+  kitten-analysts:
+    <<: *devastation-trust
+    image: {{ kitten_analysts_image }}
+    restart: unless-stopped
+    mem_limit: 128m
+    ports:
+      - "{{ kitten_analysts_http_port }}:7780"
+      - "{{ kitten_analysts_metrics_port }}:9091"
+      - "{{ kitten_analysts_websocket_port }}:9093"
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.kitten_analysts }}
 
   grafana:
     <<: *devastation-trust

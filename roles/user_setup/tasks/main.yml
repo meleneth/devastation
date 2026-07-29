@@ -223,6 +223,68 @@
         export PATH="$CARGO_HOME/bin:$PATH"
       fi
 
+- name: Create Cargo configuration directory
+  ansible.builtin.file:
+    path: "{{ cargo_home }}"
+    state: directory
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0755"
+  when: user_setup_configure_package_mirrors
+
+- name: Check for package mirror files requiring migration
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+  loop:
+    - { name: npm, path: "{{ user_setup_home }}/.npmrc" }
+    - { name: pip, path: "{{ user_setup_home }}/.config/pip/pip.conf" }
+    - { name: bundler, path: "{{ user_setup_home }}/.bundle/config" }
+  register: package_mirror_files
+  when: user_setup_configure_package_mirrors
+
+- name: Remove superseded early npm mirror block
+  ansible.builtin.blockinfile:
+    path: "{{ user_setup_home }}/.npmrc"
+    marker: "# {mark} DEVASTATION PACKAGE MIRROR"
+    state: absent
+  when:
+    - user_setup_configure_package_mirrors
+    - package_mirror_files.results[0].stat.exists
+
+- name: Remove superseded early pip mirror block
+  ansible.builtin.blockinfile:
+    path: "{{ user_setup_home }}/.config/pip/pip.conf"
+    marker: "# {mark} DEVASTATION PACKAGE MIRROR"
+    state: absent
+  when:
+    - user_setup_configure_package_mirrors
+    - package_mirror_files.results[1].stat.exists
+
+- name: Remove superseded early Bundler mirror block
+  ansible.builtin.blockinfile:
+    path: "{{ user_setup_home }}/.bundle/config"
+    marker: "# {mark} DEVASTATION PACKAGE MIRROR"
+    state: absent
+  when:
+    - user_setup_configure_package_mirrors
+    - package_mirror_files.results[2].stat.exists
+
+- name: Configure Cargo to use the local sparse registry cache
+  ansible.builtin.blockinfile:
+    path: "{{ cargo_home }}/config.toml"
+    create: true
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+    marker: "# {mark} DEVASTATION PACKAGE MIRROR"
+    block: |
+      [source.crates-io]
+      replace-with = "devastation"
+
+      [source.devastation]
+      registry = "{{ user_setup_cargo_registry }}"
+  when: user_setup_configure_package_mirrors
+
 - name: Add package cache defaults to profile
   ansible.builtin.blockinfile:
     path: "{{ user_setup_shell_profile }}"
@@ -235,6 +297,8 @@
       export NPM_CONFIG_REGISTRY="{{ user_setup_npm_registry }}"
       export PIP_INDEX_URL="{{ user_setup_pip_index_url }}"
       export GEM_SOURCE="{{ user_setup_gem_source }}"
+      export CARGO_REGISTRIES_CRATES_IO_INDEX="{{ user_setup_cargo_registry }}"
+      export GOPROXY="{{ user_setup_go_proxy }}"
   when: user_setup_configure_package_mirrors
 
 - name: Add Docker registry helpers to profile
@@ -392,8 +456,11 @@
     export PYENV_ROOT="{{ pyenv_root }}"
     export PATH="{{ pyenv_root }}/bin:$PATH"
     current_index="$("{{ pyenv_root }}/bin/pyenv" exec python -m pip config get global.index-url 2>/dev/null || true)"
+    current_trusted_host="$("{{ pyenv_root }}/bin/pyenv" exec python -m pip config get global.trusted-host 2>/dev/null || true)"
     "{{ pyenv_root }}/bin/pyenv" exec python -m pip config set global.index-url "{{ user_setup_pip_index_url }}"
-    test "$current_index" != "{{ user_setup_pip_index_url }}"
+    "{{ pyenv_root }}/bin/pyenv" exec python -m pip config set global.trusted-host "pypi-cache.{{ devastation_domain }}"
+    test "$current_index" != "{{ user_setup_pip_index_url }}" \
+      || test "$current_trusted_host" != "pypi-cache.{{ devastation_domain }}"
   args:
     executable: /bin/bash
   register: pip_mirror_config

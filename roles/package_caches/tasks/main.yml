@@ -18,6 +18,10 @@
     - { path: "{{ devastation_paths.package_caches }}/gemstash" }
     - { path: "{{ devastation_paths.package_caches }}/gemstash/build" }
     - { path: "{{ devastation_paths.package_caches }}/gemstash/data" }
+    - { path: "{{ devastation_paths.package_caches }}/cargo" }
+    - { path: "{{ devastation_paths.package_caches }}/cargo/data", owner: "101", group: "101" }
+    - { path: "{{ devastation_paths.package_caches }}/athens" }
+    - { path: "{{ devastation_paths.package_caches }}/athens/data", owner: "1000", group: "1000" }
 
 - name: Write Verdaccio configuration
   ansible.builtin.template:
@@ -31,6 +35,14 @@
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../templates/gemstash-config.yml.j2"
     dest: "{{ devastation_paths.package_caches }}/gemstash/config.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Write Cargo cache configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/cargo-cache-nginx.conf.j2"
+    dest: "{{ devastation_paths.package_caches }}/cargo/nginx.conf"
     owner: root
     group: root
     mode: "0644"
@@ -78,6 +90,8 @@
       - npm-cache
       - pypi-cache
       - gem-cache
+      - cargo-cache
+      - go-cache
     state: present
 
 - name: Wait for language package caches
@@ -89,3 +103,5 @@
     - { host: "npm-cache.{{ devastation_domain }}", port: "{{ npm_cache_port }}" }
     - { host: "pypi-cache.{{ devastation_domain }}", port: "{{ pypi_cache_port }}" }
     - { host: "gem-cache.{{ devastation_domain }}", port: "{{ gem_cache_port }}" }
+    - { host: "cargo-cache.{{ devastation_domain }}", port: "{{ cargo_cache_port }}" }
+    - { host: "go-cache.{{ devastation_domain }}", port: "{{ go_cache_port }}" }

@@ -89,6 +89,14 @@
     group: root
     mode: "0644"
 
+- name: Install Kitten Analysts dashboard
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../files/grafana-dashboard-kitten-analysts-v0.0.19.json"
+    dest: "{{ devastation_paths.observability }}/grafana/dashboards/kitten-analysts.json"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Start observability services
   community.docker.docker_compose_v2:
     project_src: "{{ devastation_paths.compose }}"
@@ -97,6 +105,7 @@
       - jaeger
       - otel-collector
       - prometheus
+      - kitten-analysts
       - grafana
       - node-exporter
       - cadvisor

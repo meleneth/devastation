@@ -33,6 +33,14 @@
     group: root
     mode: "0644"
 
+- name: Install local Vue runtime for the web portal
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../files/vue.global.prod.js"
+    dest: "{{ devastation_paths.www }}/html/vue.global.prod.js"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Install docs dependencies
   ansible.builtin.command:
     argv:

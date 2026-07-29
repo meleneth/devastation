@@ -244,6 +244,7 @@
       - --wait
       - --timeout
       - 10m
+      - --force-conflicts
   changed_when: true
   when: kind_install_platform_addons | bool
 

@@ -6,13 +6,18 @@ IMAGES="${DEVASTATION_IMAGE_PREFETCH:-debian:bookworm-slim ubuntu:24.04 alpine:3
 NPM_PACKAGES="${DEVASTATION_NPM_PREFETCH_PACKAGES:-typescript vite eslint}"
 PYTHON_PACKAGES="${DEVASTATION_PYPI_PREFETCH_PACKAGES:-pip setuptools wheel requests}"
 GEM_PACKAGES="${DEVASTATION_GEM_PREFETCH_PACKAGES:-bundler rake}"
+CARGO_CRATES="${DEVASTATION_CARGO_PREFETCH_CRATES:-serde tokio clap}"
+GO_MODULES="${DEVASTATION_GO_PREFETCH_MODULES:-golang.org/x/tools@latest github.com/spf13/cobra@latest}"
 
 NPM_REGISTRY="${DEVASTATION_NPM_REGISTRY:-http://npm-cache.deva.station:4873}"
 PIP_INDEX_URL="${DEVASTATION_PIP_INDEX_URL:-http://pypi-cache.deva.station:3141/root/pypi/+simple/}"
 GEM_SOURCE="${DEVASTATION_GEM_SOURCE:-http://gem-cache.deva.station:9292}"
+CARGO_REGISTRY="${DEVASTATION_CARGO_REGISTRY:-sparse+http://cargo-cache.deva.station:8084/index/}"
+GO_PROXY="${DEVASTATION_GO_PROXY:-http://go-cache.deva.station:3002}"
 NPM_DOWNLOAD_DIR="${DEVASTATION_NPM_DOWNLOAD_DIR:-/tmp/devastation-npm-cache-warm}"
 PIP_DOWNLOAD_DIR="${DEVASTATION_PIP_DOWNLOAD_DIR:-/tmp/devastation-pip-cache-warm}"
 GEM_DOWNLOAD_DIR="${DEVASTATION_GEM_DOWNLOAD_DIR:-/tmp/devastation-gem-cache-warm}"
+CARGO_DOWNLOAD_DIR="${DEVASTATION_CARGO_DOWNLOAD_DIR:-/tmp/devastation-cargo-cache-warm}"
 
 echo "Refreshing apt metadata through apt cache..."
 sudo apt-get update
@@ -51,6 +56,28 @@ if command -v gem >/dev/null 2>&1; then
   done
 else
   echo "Skipping RubyGems prewarm; gem is not installed."
+fi
+
+if command -v cargo >/dev/null 2>&1; then
+  echo "Prewarming Rust crates through ${CARGO_REGISTRY}: ${CARGO_CRATES}"
+  if [[ ! -f "${CARGO_DOWNLOAD_DIR}/Cargo.toml" ]]; then
+    cargo init --name devastation_cache_warm --vcs none "${CARGO_DOWNLOAD_DIR}" >/dev/null
+  fi
+  for crate in ${CARGO_CRATES}; do
+    cargo add --manifest-path "${CARGO_DOWNLOAD_DIR}/Cargo.toml" "${crate}" >/dev/null
+  done
+  cargo fetch --manifest-path "${CARGO_DOWNLOAD_DIR}/Cargo.toml"
+else
+  echo "Skipping Cargo prewarm; cargo is not installed."
+fi
+
+if command -v go >/dev/null 2>&1; then
+  echo "Prewarming Go modules through ${GO_PROXY}: ${GO_MODULES}"
+  for module in ${GO_MODULES}; do
+    GOPROXY="${GO_PROXY}" go mod download "${module}"
+  done
+else
+  echo "Skipping Go module prewarm; go is not installed."
 fi
 
 echo "Cache refresh complete."
