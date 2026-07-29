@@ -62,7 +62,7 @@
       - "{{ datawires_database_service }}"
       - psql
       - --host
-      - 127.0.0.1
+      - "{{ datawires_database_service }}"
       - --username
       - "{{ datawires_database_user }}"
       - --dbname

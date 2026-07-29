@@ -1,0 +1,16 @@
+---
+- name: Converge Datawires database credentials and project secrets
+  hosts: localhost
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+
+  tasks:
+    - name: Apply datastore role
+      ansible.builtin.import_role:
+        name: datastores
+
+    - name: Apply project secrets role
+      ansible.builtin.import_role:
+        name: project_secrets
