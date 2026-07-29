@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>multifractory</title>
+  <style>
+    :root {
+      --bg-color: #1a1c2c;
+      --panel-color: #24263b;
+      --link-color: #ffcc00;
+      --text-color: #e6e6eb;
+      --muted-color: #9da1bd;
+      --border-color: #3d4163;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    header {
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+      background: #141625;
+    }
+
+    h1 {
+      margin: 0;
+      color: var(--link-color);
+      font-size: clamp(2rem, 6vw, 4.5rem);
+      font-weight: 900;
+      letter-spacing: -0.06em;
+    }
+
+    .subtitle {
+      margin: 0.35rem 0 0;
+      color: var(--muted-color);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+      gap: 1rem;
+      padding: 1rem;
+    }
+
+    article {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--panel-color);
+    }
+
+    h2 {
+      margin: 0;
+      padding: 0.75rem;
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    a {
+      color: var(--link-color);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    iframe {
+      display: block;
+      width: 100%;
+      height: 400px;
+      border: 0;
+      border-top: 1px solid var(--border-color);
+      background: #fff;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    button {
+      padding: 0.55rem 0.8rem;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background: var(--panel-color);
+      color: var(--text-color);
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: var(--link-color);
+    }
+
+    .count {
+      color: var(--muted-color);
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>multifractory</h1>
+    <p class="subtitle">Every registered custom deva.station service, live in one page.</p>
+    <div class="toolbar">
+      <button id="reload" type="button">Reload all frames</button>
+      <span class="count" id="count"></span>
+    </div>
+  </header>
+  <main id="grid"></main>
+  <script>
+    const items = [
+      { name: "avatars", link: "https://avatars.deva.station" },
+      { name: "cnegng-docs", link: "https://cnegng-docs.deva.station" },
+      { name: "devblog", link: "https://devblog.deva.station" },
+      { name: "datawires", link: "https://datawires.deva.station" },
+      { name: "hiveware", link: "https://hiveware.deva.station" },
+      { name: "js-melstars", link: "https://js-melstars.deva.station" },
+      { name: "liz", link: "https://liz.deva.station" },
+      { name: "login", link: "https://login.deva.station" },
+      { name: "naughtsea", link: "https://naughtsea.deva.station" },
+      { name: "pymaker", link: "https://pymaker.deva.station" },
+      { name: "rubymaker", link: "https://rubymaker.deva.station" },
+      { name: "smlmaker", link: "https://smlmaker.deva.station" },
+      { name: "templator", link: "https://templator.deva.station" },
+      { name: "vjn", link: "https://vjn.deva.station" },
+      { name: "vuemaker", link: "https://vuemaker.deva.station" },
+      { name: "webhaxe", link: "https://webhaxe.demo.deva.station" }
+    ];
+
+    const grid = document.getElementById("grid");
+    document.getElementById("count").textContent = `${items.length} services`;
+
+    function loadFrame(frame, url) {
+      frame.src = "about:blank";
+      requestAnimationFrame(() => {
+        frame.src = url;
+      });
+    }
+
+    for (const item of items) {
+      const card = document.createElement("article");
+      const heading = document.createElement("h2");
+      const link = document.createElement("a");
+      const frame = document.createElement("iframe");
+
+      link.href = item.link;
+      link.textContent = item.name;
+      frame.src = item.link;
+      frame.loading = "eager";
+      frame.referrerPolicy = "no-referrer";
+      frame.title = item.name;
+
+      heading.appendChild(link);
+      card.appendChild(heading);
+      card.appendChild(frame);
+      grid.appendChild(card);
+    }
+
+    document.getElementById("reload").addEventListener("click", () => {
+      for (const [index, frame] of [...document.querySelectorAll("iframe")].entries()) {
+        loadFrame(frame, items[index].link);
+      }
+    });
+  </script>
+</body>
+</html>
