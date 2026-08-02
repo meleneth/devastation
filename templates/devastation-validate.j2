@@ -131,7 +131,7 @@ check "k9s installed" k9s version || status=1
 check "lazydocker installed" lazydocker --version || status=1
 check "trivy installed" trivy --version || status=1
 {% if obs_studio_install_enabled %}
-check "OBS Studio official installed" obs --version || status=1
+check "OBS Studio installed" obs --version || status=1
 {% endif %}
 {% if gimp_install_enabled %}
 check "GIMP official AppImage installed" gimp --version || status=1

@@ -123,36 +123,40 @@
     lock_timeout: "{{ apt_lock_timeout | int }}"
   when: official_creative_apps_enabled | bool
 
-- name: Resolve latest official OBS Studio Ubuntu package
-  ansible.builtin.shell:
-    cmd: |
-      set -euo pipefail
-      release="$(curl -fsSL {{ obs_studio_release_api | quote }})"
-      version="$(jq -r '.tag_name' <<<"$release")"
-      asset="OBS-Studio-${version}-Ubuntu-{{ obs_studio_ubuntu_release }}-x86_64.deb"
-      url="$(jq -r --arg asset "$asset" '.assets[] | select(.name == $asset) | .browser_download_url' <<<"$release")"
-      if [[ -z "$version" || "$version" == "null" || -z "$url" || "$url" == "null" ]]; then
-        echo "Unable to resolve the official OBS Studio ${asset}" >&2
-        exit 1
-      fi
-      printf '%s\n%s\n' "$version" "$url"
-  args:
-    executable: /bin/bash
-  register: obs_studio_latest_release
+- name: Remove distribution OBS Studio package
+  ansible.builtin.apt:
+    name: obs-studio
+    state: absent
+    lock_timeout: "{{ apt_lock_timeout | int }}"
+  when: obs_studio_install_enabled | bool
+
+- name: Install Flatpak for OBS Studio
+  ansible.builtin.apt:
+    name: flatpak
+    state: present
+    lock_timeout: "{{ apt_lock_timeout | int }}"
+  when: obs_studio_install_enabled | bool
+
+- name: Configure Flathub for OBS Studio
+  ansible.builtin.command:
+    cmd: "flatpak remote-add --system --if-not-exists flathub {{ obs_studio_flathub_repository }}"
   changed_when: false
   when: obs_studio_install_enabled | bool
 
-- name: Download latest official OBS Studio package
-  ansible.builtin.get_url:
-    url: "{{ obs_studio_latest_release.stdout_lines[1] }}"
-    dest: "/tmp/OBS-Studio-{{ obs_studio_latest_release.stdout_lines[0] }}-Ubuntu-{{ obs_studio_ubuntu_release }}-x86_64.deb"
-    mode: "0644"
+- name: Install or update official OBS Studio Flatpak
+  ansible.builtin.command:
+    cmd: "flatpak install --system --noninteractive --or-update flathub {{ obs_studio_flatpak_id }}"
+  register: obs_studio_flatpak_install
+  changed_when: "'Installing' in obs_studio_flatpak_install.stdout or 'Updating' in obs_studio_flatpak_install.stdout"
   when: obs_studio_install_enabled | bool
 
-- name: Install latest official OBS Studio package
-  ansible.builtin.apt:
-    deb: "/tmp/OBS-Studio-{{ obs_studio_latest_release.stdout_lines[0] }}-Ubuntu-{{ obs_studio_ubuntu_release }}-x86_64.deb"
-    lock_timeout: "{{ apt_lock_timeout | int }}"
+- name: Install OBS Studio command wrapper
+  ansible.builtin.copy:
+    dest: /usr/local/bin/obs
+    mode: "0755"
+    content: |
+      #!/bin/sh
+      exec flatpak run {{ obs_studio_flatpak_id | quote }} "$@"
   when: obs_studio_install_enabled | bool
 
 - name: Resolve latest official GIMP x86_64 AppImage

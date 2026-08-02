@@ -38,7 +38,7 @@ The current feature set includes:
 - Explicit image mirroring into the private registry for required images hosted outside Docker Hub
 - Package caching for apt, npm, PyPI, and RubyGems
 - KIND with local registry trust, cert-manager, Istio, Argo CD, and the OpenTelemetry Operator
-- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, the latest official OBS Studio, GIMP, Blender, Krita, and Inkscape releases, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, goenv, rustup, and MesloLGS Nerd Font
+- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, OBS Studio, the latest official GIMP, Blender, Krita, and Inkscape releases, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, goenv, rustup, and MesloLGS Nerd Font
 - GitLab CE and a Docker-executor GitLab Runner
 - Vault dev server, Eventline GoAWS SNS/SQS emulator, MinIO object storage, SeaweedFS S3 object storage, Mailpit, Keycloak, Keystone, Playwright, and Postgres containers
 - Prometheus, Grafana, Loki, Jaeger v2, OpenTelemetry Collector, node-exporter, cAdvisor, registry metrics, and Postgres exporters
@@ -100,7 +100,7 @@ The `dev_tools` role installs Ghostty when `ghostty_install_enabled: true`. It u
 
 The `dev_tools` role installs the official Discord Debian package when `discord_install_enabled: true`. Set `discord_deb_url` to pin or mirror a package instead of using Discord's current Linux download endpoint.
 
-When `official_creative_apps_enabled: true`, the `dev_tools` role resolves and installs the newest stable upstream x86_64 releases on every convergence. OBS Studio uses the official OBS Project Ubuntu 24.04 Debian package. GIMP, Krita, and Inkscape use their projects' official AppImages under `/opt`, with commands in `/usr/local/bin` and launchers in `/usr/local/share/applications`. No Flatpak, Flathub, Snap, or Debian repository versions are used for these applications.
+When `official_creative_apps_enabled: true`, the `dev_tools` role installs or updates the official OBS Studio Flatpak from Flathub and resolves the newest stable upstream x86_64 releases of the other creative applications on every convergence. OBS uses Flatpak on Debian so that no Ubuntu packages or Ubuntu-specific library dependencies enter the host. GIMP, Krita, and Inkscape use their projects' official AppImages under `/opt`, with commands in `/usr/local/bin` and launchers in `/usr/local/share/applications`. No Snap versions are used for these applications.
 
 The `dev_tools` role removes the distro `blender` package when `blender_remove_distro_package: true`, resolves the newest official Linux x64 Blender release from `download.blender.org` each run, installs it under `/opt/blender/current`, and links it at `/usr/local/bin/blender`.
 
