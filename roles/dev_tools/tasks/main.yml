@@ -159,6 +159,22 @@
       exec flatpak run {{ obs_studio_flatpak_id | quote }} "$@"
   when: obs_studio_install_enabled | bool
 
+- name: Install or update Lutris Flatpak
+  ansible.builtin.command:
+    cmd: "flatpak install --system --noninteractive --or-update flathub {{ lutris_flatpak_id }}"
+  register: lutris_flatpak_install
+  changed_when: "'Installing' in lutris_flatpak_install.stdout or 'Updating' in lutris_flatpak_install.stdout"
+  when: lutris_install_enabled | bool
+
+- name: Install Lutris command wrapper
+  ansible.builtin.copy:
+    dest: /usr/local/bin/lutris
+    mode: "0755"
+    content: |
+      #!/bin/sh
+      exec flatpak run {{ lutris_flatpak_id | quote }} "$@"
+  when: lutris_install_enabled | bool
+
 - name: Resolve latest official GIMP x86_64 AppImage
   ansible.builtin.shell:
     cmd: |

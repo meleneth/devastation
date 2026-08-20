@@ -38,7 +38,7 @@ The current feature set includes:
 - Explicit image mirroring into the private registry for required images hosted outside Docker Hub
 - Package caching for apt, npm, PyPI, and RubyGems
 - KIND with local registry trust, cert-manager, Istio, Argo CD, and the OpenTelemetry Operator
-- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, OBS Studio, the latest official GIMP, Blender, Krita, and Inkscape releases, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, goenv, rustup, and MesloLGS Nerd Font
+- Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, Lutris, OBS Studio, the latest official GIMP, Blender, Krita, and Inkscape releases, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, goenv, rustup, and MesloLGS Nerd Font
 - A Pango-backed KMS console on `tty2` for broad Unicode and emoji fallback, with the kernel console retained on `tty1` and the remaining VTs
 - GitLab CE and a Docker-executor GitLab Runner
 - Vault dev server, Eventline GoAWS SNS/SQS emulator, MinIO object storage, SeaweedFS S3 object storage, Mailpit, Keycloak, Keystone, Playwright, and Postgres containers
@@ -100,6 +100,8 @@ The `neovim` role installs the latest official upstream Linux x86_64 Neovim rele
 The `dev_tools` role installs Ghostty when `ghostty_install_enabled: true`. It uses an existing `ghostty` apt package when available, then falls back to the community-maintained Debian/Ubuntu `.deb` package when `ghostty_community_deb_enabled: true`.
 
 The `dev_tools` role installs the official Discord Debian package when `discord_install_enabled: true`. Set `discord_deb_url` to pin or mirror a package instead of using Discord's current Linux download endpoint.
+
+The `dev_tools` role installs or updates the Lutris Flatpak from Flathub when `lutris_install_enabled: true`. Lutris provides the managed Wine environment and Battle.net integration used for Windows games such as Diablo II: Resurrected.
 
 When `official_creative_apps_enabled: true`, the `dev_tools` role installs or updates the official OBS Studio Flatpak from Flathub and resolves the newest stable upstream x86_64 releases of the other creative applications on every convergence. OBS uses Flatpak on Debian so that no Ubuntu packages or Ubuntu-specific library dependencies enter the host. GIMP, Krita, and Inkscape use their projects' official AppImages under `/opt`, with commands in `/usr/local/bin` and launchers in `/usr/local/share/applications`. No Snap versions are used for these applications.
 

@@ -464,6 +464,8 @@ official_appimage_desktop_directory: /usr/local/share/applications
 obs_studio_install_enabled: "{{ official_creative_apps_enabled }}"
 obs_studio_flatpak_id: com.obsproject.Studio
 obs_studio_flathub_repository: https://flathub.org/repo/flathub.flatpakrepo
+lutris_install_enabled: true
+lutris_flatpak_id: net.lutris.Lutris
 gimp_install_enabled: "{{ official_creative_apps_enabled }}"
 gimp_download_page_url: https://www.gimp.org/downloads/
 krita_install_enabled: "{{ official_creative_apps_enabled }}"
