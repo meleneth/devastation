@@ -1,4 +1,61 @@
 ---
+- name: Discover active NetworkManager IPv4 DNS servers
+  ansible.builtin.command:
+    argv:
+      - nmcli
+      - --get-values
+      - IP4.DNS
+      - device
+      - show
+  register: dns_networkmanager_query
+  check_mode: false
+  changed_when: false
+  failed_when: false
+
+- name: Read host resolver configuration
+  ansible.builtin.slurp:
+    src: /etc/resolv.conf
+  register: dns_resolv_conf
+
+- name: Select safe discovered upstream DNS servers
+  ansible.builtin.set_fact:
+    dns_discovered_upstream_resolvers: >-
+      {{
+        (
+          (dns_networkmanager_query.stdout | default('') |
+            regex_findall('(?m)^([0-9]{1,3}(?:\.[0-9]{1,3}){3})$'))
+          +
+          (dns_resolv_conf.content | b64decode |
+            regex_findall('(?m)^nameserver\s+([0-9]{1,3}(?:\.[0-9]{1,3}){3})(?:\s|$)'))
+        )
+        | unique
+        | reject('match', '^127\.')
+        | reject('equalto', devastation_subnets.dns)
+        | list
+      }}
+
+- name: Choose configured or discovered upstream DNS servers
+  ansible.builtin.set_fact:
+    dns_effective_upstream_resolvers: >-
+      {{
+        (dns_upstream_resolvers | default([]) | length > 0)
+        | ternary(dns_upstream_resolvers, dns_discovered_upstream_resolvers)
+      }}
+
+- name: Assert safe upstream DNS servers are available
+  ansible.builtin.assert:
+    that:
+      - dns_effective_upstream_resolvers | length > 0
+      - devastation_subnets.dns not in dns_effective_upstream_resolvers
+      - dns_effective_upstream_resolvers | select('match', '^127\.') | list | length == 0
+    fail_msg: >-
+      No safe upstream DNS server was found. Set dns_upstream_resolvers to an
+      explicit list of resolvers reachable from the Devastation Docker network.
+
+- name: Report selected upstream DNS servers
+  ansible.builtin.debug:
+    msg: "Using upstream DNS servers: {{ dns_effective_upstream_resolvers | join(', ') }}"
+
 - name: Create DNS directory
   ansible.builtin.file:
     path: "{{ devastation_paths.dns }}"

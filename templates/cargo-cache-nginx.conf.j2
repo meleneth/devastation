@@ -4,7 +4,7 @@ proxy_cache_path /var/cache/nginx/crates levels=1:2 keys_zone=crates:20m
 server {
     listen {{ cargo_cache_port }};
     server_name _;
-    resolver {{ dns_upstream_resolvers | join(' ') }} ipv6=off;
+    resolver {{ dns_effective_upstream_resolvers | join(' ') }} ipv6=off;
 
     location = /health {
         access_log off;

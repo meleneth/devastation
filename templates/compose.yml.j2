@@ -72,7 +72,7 @@ services:
     image: sameersbn/apt-cacher-ng:3.7.4-20220421
     restart: unless-stopped
     dns:
-{% for resolver in dns_upstream_resolvers %}
+{% for resolver in dns_effective_upstream_resolvers %}
       - {{ resolver }}
 {% endfor %}
     volumes:
@@ -523,6 +523,9 @@ services:
       - --path.sysfs=/host/sys
       - --path.rootfs=/rootfs
       - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+      # Enumerating hwmon reads the runtime-suspended RX 7700S temperature
+      # sensors and wakes the dGPU on every Prometheus scrape.
+      - --no-collector.hwmon
       - --collector.systemd
       - --collector.processes
     pid: host
@@ -560,14 +563,37 @@ services:
       GITLAB_OMNIBUS_CONFIG: |
         external_url '{{ gitlab_external_url }}'
         gitlab_rails['gitlab_shell_ssh_port'] = {{ gitlab_ssh_port }}
+{% if gitlab_oidc_enabled %}
+        gitlab_rails['omniauth_enabled'] = true
+        gitlab_rails['omniauth_allow_single_sign_on'] = ['openid_connect']
+        gitlab_rails['omniauth_block_auto_created_users'] = false
+        gitlab_rails['omniauth_providers'] = [
+          {
+            name: 'openid_connect',
+            label: '{{ gitlab_oidc_label }}',
+            args: {
+              name: 'openid_connect',
+              scope: ['openid', 'profile', 'email'],
+              response_type: 'code',
+              issuer: '{{ gitlab_oidc_issuer }}',
+              discovery: true,
+              client_auth_method: 'query',
+              uid_field: 'preferred_username',
+              pkce: true,
+              client_options: {
+                identifier: '{{ gitlab_oidc_client_id }}',
+                secret: '{{ gitlab_oidc_client_secret }}',
+                redirect_uri: '{{ gitlab_external_url }}/users/auth/openid_connect/callback'
+              }
+            }
+          }
+        ]
+{% endif %}
         nginx['listen_port'] = 443
         nginx['listen_https'] = true
         nginx['ssl_certificate'] = "/devastation-certs/gitlab/tls.crt"
         nginx['ssl_certificate_key'] = "/devastation-certs/gitlab/tls.key"
         registry_external_url nil
-    ports:
-      - "{{ gitlab_http_port }}:80"
-      - "{{ gitlab_https_port }}:443"
     volumes:
       - {{ devastation_paths.gitlab }}/config:/etc/gitlab
       - {{ devastation_paths.gitlab }}/logs:/var/log/gitlab

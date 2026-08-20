@@ -107,6 +107,8 @@
     - name: Apply DNS role
       ansible.builtin.import_role:
         name: dns
+      tags:
+        - dns
 
     - name: Restart resolver before DNS-dependent services
       ansible.builtin.meta: flush_handlers
@@ -118,6 +120,13 @@
     - name: Apply apt cache role
       ansible.builtin.import_role:
         name: apt_cache
+
+    - name: Apply KMS console role
+      ansible.builtin.import_role:
+        name: kms_console
+      when: kms_console_enabled | bool
+      tags:
+        - kms_console
 
     - name: Apply package caches role
       ansible.builtin.import_role:

@@ -95,6 +95,29 @@
       },
       "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+    },
+    {
+      "clientId": "{{ gitlab_oidc_client_id }}",
+      "name": "GitLab",
+      "enabled": {{ gitlab_oidc_enabled | bool | lower }},
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "{{ gitlab_oidc_client_secret }}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "{{ gitlab_external_url }}/users/auth/openid_connect/callback"
+      ],
+      "webOrigins": [
+        "{{ gitlab_external_url }}"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "{{ gitlab_external_url }}/*",
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
     }
   ]
 }

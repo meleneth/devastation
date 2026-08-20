@@ -43,8 +43,19 @@
     mode: "0755"
   loop:
     - "{{ devastation_paths.gitlab }}/config"
+    - "{{ devastation_paths.gitlab }}/config/trusted-certs"
     - "{{ devastation_paths.gitlab }}/logs"
     - "{{ devastation_paths.gitlab }}/data"
+
+- name: Install Devastation root CA into GitLab Omnibus trust
+  ansible.builtin.copy:
+    src: "{{ devastation_paths.ca }}/root-ca.crt"
+    dest: "{{ devastation_paths.gitlab }}/config/trusted-certs/devastation-root-ca.crt"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  register: gitlab_omnibus_ca
 
 - name: Mark GitLab data as managed by devastation
   ansible.builtin.copy:
@@ -60,3 +71,25 @@
     services:
       - gitlab
     state: present
+
+- name: Wait for GitLab before refreshing Omnibus trust
+  ansible.builtin.wait_for:
+    host: "{{ gitlab_hostname }}"
+    port: 443
+    timeout: 300
+  when: gitlab_omnibus_ca.changed
+
+- name: Reconfigure GitLab after changing Omnibus trust
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ devastation_paths.compose }}/compose.yml"
+      - exec
+      - -T
+      - gitlab
+      - gitlab-ctl
+      - reconfigure
+  changed_when: true
+  when: gitlab_omnibus_ca.changed

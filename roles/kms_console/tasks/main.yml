@@ -1,0 +1,45 @@
+---
+- name: Assert KMS console is limited to a spare virtual terminal
+  ansible.builtin.assert:
+    that:
+      - kms_console_vt is match('^tty[2-9][0-9]*$')
+    fail_msg: "kms_console_vt must be tty2 or higher so tty1 remains a kernel-console recovery path."
+
+- name: Enable Debian backports for KMS console
+  ansible.builtin.apt_repository:
+    repo: "deb http://deb.debian.org/debian {{ kms_console_backports_suite }} main"
+    filename: devastation-backports
+    state: present
+    update_cache: true
+
+- name: Install Unicode fonts
+  ansible.builtin.apt:
+    name: "{{ kms_console_font_packages }}"
+    state: present
+    lock_timeout: "{{ apt_lock_timeout | int }}"
+
+- name: Install KMS console from backports
+  ansible.builtin.apt:
+    name: kmscon
+    state: present
+    default_release: "{{ kms_console_backports_suite }}"
+    lock_timeout: "{{ apt_lock_timeout | int }}"
+
+- name: Configure KMS console Unicode rendering
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/kmscon.conf.j2"
+    dest: /etc/kmscon/kmscon.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart KMS console
+
+- name: Enable KMS console on the selected virtual terminal
+  ansible.builtin.systemd_service:
+    name: "kmsconvt@{{ kms_console_vt }}.service"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Flush KMS console configuration before validation
+  ansible.builtin.meta: flush_handlers

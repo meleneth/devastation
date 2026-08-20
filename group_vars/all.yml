@@ -233,6 +233,19 @@ base_packages_default:
   - xz-utils
   - yq
 
+# Keep the kernel console available on every other VT while using kmscon on one
+# explicitly selected recovery-safe login console.
+kms_console_enabled: true
+kms_console_vt: tty2
+kms_console_backports_suite: trixie-backports
+kms_console_font_packages:
+  - fonts-noto-core
+  - fonts-noto-color-emoji
+kms_console_font_engine: pango
+kms_console_font_name: Noto Sans Mono
+kms_console_font_size: 16
+kms_console_xkb_layout: us
+
 user_setup_enabled: true
 user_setup_home: "{{ lookup('ansible.builtin.env', 'HOME') }}"
 user_setup_shell_profile: "{{ user_setup_home }}/.profile"
@@ -313,9 +326,9 @@ lazyvim_enabled: true
 lazyvim_starter_repo: https://github.com/LazyVim/starter.git
 lazyvim_starter_version: main
 
-dns_upstream_resolvers:
-  - 1.1.1.1
-  - 9.9.9.9
+# Leave empty to discover the active host DNS servers from NetworkManager and
+# /etc/resolv.conf during convergence. Set a list here to override discovery.
+dns_upstream_resolvers: []
 dns_configure_hosts_file: true
 dns_configure_host_resolver: true
 dns_systemd_resolved_dropin: /etc/systemd/resolved.conf.d/devastation.conf
@@ -477,12 +490,15 @@ istio_helm_repo: https://istio-release.storage.googleapis.com/charts
 argocd_manifest_url: "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml"
 otel_operator_manifest_url: "https://github.com/open-telemetry/opentelemetry-operator/releases/download/{{ otel_operator_version }}/opentelemetry-operator.yaml"
 
-gitlab_version: "17.1.1-ce.0"
+gitlab_version: "19.2.4-ce.0"
 gitlab_hostname: "gitlab.{{ devastation_domain }}"
 gitlab_external_url: "https://{{ gitlab_hostname }}"
 gitlab_ssh_port: 22
-gitlab_http_port: 8080
-gitlab_https_port: 8443
+gitlab_oidc_enabled: true
+gitlab_oidc_label: Devastation IAM
+gitlab_oidc_client_id: gitlab
+gitlab_oidc_client_secret: devastation-gitlab-secret
+gitlab_oidc_issuer: "https://iam.{{ devastation_domain }}/realms/{{ keycloak_realm }}"
 gitlab_allow_existing_data: false
 gitlab_migration_enabled: false
 gitlab_backup_tar: ""
@@ -491,12 +507,15 @@ gitlab_old_logs_path: ""
 gitlab_old_data_path: ""
 gitlab_stop_grace_period: 10m
 
-gitlab_runner_version: "alpine-v17.1.0"
+gitlab_runner_version: "alpine-v19.2.2"
+gitlab_runner_auto_register: true
+gitlab_runner_description: "runner.{{ devastation_domain }}"
 gitlab_runner_authentication_token: ""
 gitlab_runner_registration_token: ""
 gitlab_runner_executor: docker
 gitlab_runner_docker_image: docker:27
-gitlab_runner_mount_docker_socket: false
+gitlab_runner_mount_docker_socket: true
+gitlab_runner_docker_network_mode: devastation
 gitlab_runner_tags: "local,devastation,docker"
 
 postgres_version: "18.4"

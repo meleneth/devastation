@@ -1,0 +1,22 @@
+# frozen_string_literal: true
+
+description = {{ gitlab_runner_description | to_json }}
+runner = Ci::Runner.find_by(description: description, runner_type: :instance_type)
+
+unless runner
+  response = Ci::Runners::CreateRunnerService.new(
+    user: User.find_by_username!('root'),
+    params: {
+      runner_type: 'instance_type',
+      description: description,
+      tag_list: {{ gitlab_runner_tags.split(',') | map('trim') | list | to_json }},
+      run_untagged: false,
+      access_level: 'not_protected'
+    }
+  ).execute
+  abort("Runner creation failed: #{response.message}") unless response.success?
+  runner = response.payload.fetch(:runner)
+end
+
+abort('Runner authentication token is unavailable') if runner.token.blank?
+puts runner.token

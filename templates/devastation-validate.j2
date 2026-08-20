@@ -89,6 +89,13 @@ check "apt cache reachable" curl -fsS "http://apt-cache.${DOMAIN}:{{ apt_cache_p
 check "transparent apt frontend reachable" curl -fsS -H "Host: deb.debian.org" "http://{{ devastation_subnets.apt_cache_transparent }}/debian/dists/stable/Release" || status=1
 {% endif %}
 check "host apt uses local HTTP proxy" bash -c "grep -Fq 'Acquire::http::Proxy \"http://apt-cache.${DOMAIN}:{{ apt_cache_port }}\"' /etc/apt/apt.conf.d/01devastation-proxy" || status=1
+{% if kms_console_enabled %}
+check "kmscon installed" kmscon --version || status=1
+check "kmscon configured for Unicode rendering" bash -c "grep -Fqx 'font-engine={{ kms_console_font_engine }}' /etc/kmscon/kmscon.conf && grep -Fqx 'font-name={{ kms_console_font_name }}' /etc/kmscon/kmscon.conf" || status=1
+check "kmscon enabled on {{ kms_console_vt }}" systemctl is-enabled --quiet "kmsconvt@{{ kms_console_vt }}.service" || status=1
+check "kmscon active on {{ kms_console_vt }}" systemctl is-active --quiet "kmsconvt@{{ kms_console_vt }}.service" || status=1
+check "tty1 kernel console recovery preserved" bash -c "systemctl is-enabled getty@tty1.service >/dev/null 2>&1 || systemctl is-active --quiet getty@tty1.service" || status=1
+{% endif %}
 check "npm cache reachable" curl -fsS "http://npm-cache.${DOMAIN}:{{ npm_cache_port }}/-/ping" || status=1
 check "PyPI cache reachable" curl -fsSL "http://pypi-cache.${DOMAIN}:{{ pypi_cache_port }}/root/pypi/+simple/" || status=1
 check "RubyGems cache reachable" curl -fsS "http://gem-cache.${DOMAIN}:{{ gem_cache_port }}/" || status=1
@@ -164,8 +171,19 @@ check "Argo CD installed" kubectl -n argocd get deployment argocd-server || stat
 check "OTel operator installed" kubectl -n opentelemetry-operator-system get deployment opentelemetry-operator-controller-manager || status=1
 {% endif %}
 retry_check "GitLab web reachable" 24 5 curl -kfsS "{{ gitlab_external_url }}/users/sign_in" || status=1
+{% if gitlab_oidc_enabled %}
+check "GitLab advertises Devastation IAM login" bash -c 'curl -kfsS "{{ gitlab_external_url }}/users/sign_in" | grep -Fq "{{ gitlab_oidc_label }}"' || status=1
+check "GitLab Rails trusts Devastation IAM TLS" docker compose -f "{{ devastation_paths.compose }}/compose.yml" exec -T gitlab gitlab-rails runner 'require "net/http"; response = Net::HTTP.get_response(URI("{{ gitlab_oidc_issuer }}/.well-known/openid-configuration")); abort("HTTP #{response.code}") unless response.is_a?(Net::HTTPSuccess)' || status=1
+{% endif %}
 check "GitLab SSH reachable" nc -z "{{ gitlab_hostname }}" {{ gitlab_ssh_port }} || status=1
+check "GitLab has no host-published ports" bash -c 'test "$(docker inspect compose-gitlab-1 --format "{{ "{{json .HostConfig.PortBindings}}" }}")" = "{}"' || status=1
 check "runner container running" docker compose -f "{{ devastation_paths.compose }}/compose.yml" ps --status running gitlab-runner || status=1
+check "GitLab Runner registered" docker compose -f "{{ devastation_paths.compose }}/compose.yml" exec -T gitlab-runner gitlab-runner verify || status=1
+{% if gitlab_runner_mount_docker_socket %}
+check "GitLab Runner Docker socket mounted" docker compose -f "{{ devastation_paths.compose }}/compose.yml" exec -T gitlab-runner test -S /var/run/docker.sock || status=1
+{% endif %}
+check "GitLab Runner job network configured" docker compose -f "{{ devastation_paths.compose }}/compose.yml" exec -T gitlab-runner grep -Fq 'network_mode = "{{ gitlab_runner_docker_network_mode }}"' /etc/gitlab-runner/config.toml || status=1
+check "GitLab Runner job network resolves GitLab" docker run --rm --network "{{ gitlab_runner_docker_network_mode }}" busybox:1.36 nslookup "{{ gitlab_hostname }}" || status=1
 check "neovim installed" nvim --version || status=1
 
 if [[ "$QUICK" == "0" ]]; then

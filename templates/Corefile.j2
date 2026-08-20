@@ -27,5 +27,5 @@
 .:53 {
     errors
     cache 30
-    forward . {{ dns_upstream_resolvers | join(' ') }}
+    forward . {{ dns_effective_upstream_resolvers | join(' ') }}
 }

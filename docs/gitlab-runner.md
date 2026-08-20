@@ -2,6 +2,17 @@
 
 GitLab runs at `https://gitlab.deva.station`.
 
+Sign in through **Devastation IAM** using any enabled account in the Keycloak
+`devastation` realm at `https://iam.deva.station`. GitLab creates the
+corresponding account on first sign-in from its verified email address and
+preferred username. Local GitLab password authentication remains enabled as a
+recovery path for the `root` administrator.
+
+The GitLab role installs the Devastation root CA into the Omnibus-specific
+`/etc/gitlab/trusted-certs` store. This is required for Rails and OmniAuth even
+though the shared workload CA environment is sufficient for tools such as
+`curl`.
+
 ## First Administrator Sign-In
 
 The first administrator account is `root`.
@@ -26,28 +37,25 @@ If sign-up approval is required:
 
 After approval, sign out of `root` and sign in as your normal user.
 
-## Create The Runner Token
+## Runner Registration
 
-GitLab 17 uses runner authentication tokens. The value starts with `glrt-`.
+Ansible automatically creates and registers the `runner.deva.station` instance
+runner by default. Its `glrt-*` authentication token is retained with mode
+`0600` under `/srv/devastation/gitlab-runner/config/` so an interrupted
+registration can be retried without creating duplicate runners.
 
-1. Sign in as an administrator.
-2. Open `Admin Area`.
-3. Open `CI/CD` -> `Runners`.
-4. Choose `New instance runner`.
-5. Use a description like `runner.deva.station`.
-6. Add tags such as `local`, `devastation`, and `docker`.
-7. Create the runner.
-8. Copy the `glrt-...` authentication token.
-
-## Register The Runner
-
-Rerun convergence with the token:
-
-```bash
-./bin/devastation-up -e gitlab_runner_authentication_token='glrt-REDACTED'
-```
+Set `gitlab_runner_auto_register: false` to disable this behavior. An explicit
+`gitlab_runner_authentication_token` remains available as an override.
 
 The runner uses the Docker executor. Docker socket mounting is disabled by default because it gives jobs host-level Docker control.
+
+Runner job and helper containers use the `devastation` Docker network so they
+can resolve private service names such as `gitlab.deva.station` through the
+Devastation DNS service. Configure this with:
+
+```yaml
+gitlab_runner_docker_network_mode: devastation
+```
 
 To enable local Docker control for jobs:
 

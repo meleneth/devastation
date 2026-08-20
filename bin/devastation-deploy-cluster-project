@@ -179,7 +179,7 @@ fi
 if [[ "$SKIP_BUILD" != "1" ]]; then
   echo "Building ${IMAGE}:latest from cluster/${PROJECT}..."
   notify_devastation normal "Building project image" "${PROJECT}: docker build started."
-  docker build -t "$IMAGE" "$CONTEXT"
+  docker build --network host -t "$IMAGE" "$CONTEXT"
 
   echo "Pushing ${IMAGE}:latest..."
   notify_devastation normal "Pushing project image" "${PROJECT}: docker push started."

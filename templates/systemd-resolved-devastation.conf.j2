@@ -1,4 +1,4 @@
 [Resolve]
 DNS={{ devastation_subnets.dns }}
 Domains=~{{ devastation_domain }}
-FallbackDNS={{ dns_upstream_resolvers | join(' ') }}
+FallbackDNS={{ dns_effective_upstream_resolvers | join(' ') }}

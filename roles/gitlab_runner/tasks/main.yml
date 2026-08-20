@@ -7,6 +7,14 @@
     group: root
     mode: "0755"
 
+- name: Install idempotent GitLab runner bootstrap script
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/gitlab-bootstrap-runner.rb.j2"
+    dest: "{{ devastation_paths.gitlab }}/config/bootstrap-runner.rb"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Start GitLab Runner service
   community.docker.docker_compose_v2:
     project_src: "{{ devastation_paths.compose }}"
@@ -19,39 +27,157 @@
     path: "{{ devastation_paths.gitlab_runner }}/config/config.toml"
   register: runner_config
 
-- name: Select GitLab Runner token mode
+- name: Check for a retained automatic runner token
+  ansible.builtin.stat:
+    path: "{{ devastation_paths.gitlab_runner }}/config/bootstrap-token"
+  register: runner_bootstrap_token_file
+
+- name: Wait for GitLab before automatic runner creation
+  ansible.builtin.wait_for:
+    host: "{{ gitlab_hostname }}"
+    port: 443
+    timeout: 300
+  when:
+    - gitlab_runner_auto_register | bool
+    - not runner_config.stat.exists
+    - not runner_bootstrap_token_file.stat.exists
+    - gitlab_runner_authentication_token | default('', true) | length == 0
+    - gitlab_runner_registration_token | default('', true) | length == 0
+
+- name: Create or recover the automatic instance runner token
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ devastation_paths.compose }}/compose.yml"
+      - exec
+      - -T
+      - gitlab
+      - gitlab-rails
+      - runner
+      - /etc/gitlab/bootstrap-runner.rb
+  register: runner_created_token
+  no_log: true
+  when:
+    - gitlab_runner_auto_register | bool
+    - not runner_config.stat.exists
+    - not runner_bootstrap_token_file.stat.exists
+    - gitlab_runner_authentication_token | default('', true) | length == 0
+    - gitlab_runner_registration_token | default('', true) | length == 0
+
+- name: Retain the automatic runner token for retry-safe registration
+  ansible.builtin.copy:
+    dest: "{{ devastation_paths.gitlab_runner }}/config/bootstrap-token"
+    content: "{{ runner_created_token.stdout | trim }}\n"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when: runner_created_token is not skipped
+
+- name: Read the retained automatic runner token
+  ansible.builtin.slurp:
+    src: "{{ devastation_paths.gitlab_runner }}/config/bootstrap-token"
+  register: runner_retained_token
+  no_log: true
+  when:
+    - not runner_config.stat.exists
+    - gitlab_runner_authentication_token | default('', true) | length == 0
+    - gitlab_runner_registration_token | default('', true) | length == 0
+    - gitlab_runner_auto_register | bool
+
+- name: Select GitLab Runner authentication token
   ansible.builtin.set_fact:
-    gitlab_runner_effective_token: >-
+    gitlab_runner_effective_authentication_token: >-
       {{ gitlab_runner_authentication_token
          if (gitlab_runner_authentication_token | default('', true) | length > 0)
-         else (gitlab_runner_registration_token | default('', true)) }}
-    gitlab_runner_token_option: >-
-      {{ '--token'
-         if (gitlab_runner_authentication_token | default('', true) | length > 0)
-         else '--registration-token' }}
+         else ((runner_retained_token.content | b64decode | trim)
+               if (runner_retained_token is not skipped) else '') }}
   no_log: true
 
-- name: Register GitLab Runner when token is supplied
-  ansible.builtin.command: >-
-    docker compose -f {{ devastation_paths.compose }}/compose.yml exec -T gitlab-runner
-    gitlab-runner register --non-interactive
-    --url {{ gitlab_external_url }}
-    {{ gitlab_runner_token_option }} {{ gitlab_runner_effective_token }}
-    --executor {{ gitlab_runner_executor }}
-    --docker-image {{ gitlab_runner_docker_image }}
-    --description runner.{{ devastation_domain }}
-    --tag-list {{ gitlab_runner_tags }}
+- name: Register GitLab Runner with a modern authentication token
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ devastation_paths.compose }}/compose.yml"
+      - exec
+      - -T
+      - gitlab-runner
+      - gitlab-runner
+      - register
+      - --non-interactive
+      - --url
+      - "{{ gitlab_external_url }}"
+      - --token
+      - "{{ gitlab_runner_effective_authentication_token }}"
+      - --executor
+      - "{{ gitlab_runner_executor }}"
+      - --docker-image
+      - "{{ gitlab_runner_docker_image }}"
+      - --description
+      - "{{ gitlab_runner_description }}"
+  register: gitlab_runner_modern_registration
+  retries: 20
+  delay: 15
+  until: gitlab_runner_modern_registration.rc == 0
   no_log: true
   when:
-    - gitlab_runner_effective_token | length > 0
     - not runner_config.stat.exists
+    - gitlab_runner_effective_authentication_token | length > 0
 
-- name: Print manual GitLab Runner registration steps
-  ansible.builtin.debug:
-    msg:
-      - "No gitlab_runner_authentication_token supplied."
-      - "In GitLab, create an instance, group, or project runner and copy the glrt-* authentication token."
-      - "Rerun with -e gitlab_runner_authentication_token=glrt-REDACTED."
+- name: Register GitLab Runner with a legacy registration token
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -f
+      - "{{ devastation_paths.compose }}/compose.yml"
+      - exec
+      - -T
+      - gitlab-runner
+      - gitlab-runner
+      - register
+      - --non-interactive
+      - --url
+      - "{{ gitlab_external_url }}"
+      - --registration-token
+      - "{{ gitlab_runner_registration_token }}"
+      - --executor
+      - "{{ gitlab_runner_executor }}"
+      - --docker-image
+      - "{{ gitlab_runner_docker_image }}"
+      - --description
+      - "{{ gitlab_runner_description }}"
+      - --tag-list
+      - "{{ gitlab_runner_tags }}"
+  register: gitlab_runner_legacy_registration
+  retries: 20
+  delay: 15
+  until: gitlab_runner_legacy_registration.rc == 0
+  no_log: true
   when:
-    - gitlab_runner_effective_token | length == 0
     - not runner_config.stat.exists
+    - gitlab_runner_effective_authentication_token | length == 0
+    - gitlab_runner_registration_token | default('', true) | length > 0
+
+- name: Require a registration method for an unconfigured runner
+  ansible.builtin.assert:
+    that:
+      - >-
+        runner_config.stat.exists or
+        gitlab_runner_auto_register | bool or
+        gitlab_runner_authentication_token | default('', true) | length > 0 or
+        gitlab_runner_registration_token | default('', true) | length > 0
+    fail_msg: >-
+      Runner registration is disabled and no authentication or legacy registration token was supplied.
+
+- name: Attach GitLab Runner jobs to the Devastation network
+  ansible.builtin.lineinfile:
+    path: "{{ devastation_paths.gitlab_runner }}/config/config.toml"
+    regexp: '^\s*network_mode\s*='
+    insertafter: '^\s*\[runners\.docker\]\s*$'
+    line: '    network_mode = "{{ gitlab_runner_docker_network_mode }}"'
+    mode: "0600"

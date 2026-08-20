@@ -39,6 +39,7 @@ The current feature set includes:
 - Package caching for apt, npm, PyPI, and RubyGems
 - KIND with local registry trust, cert-manager, Istio, Argo CD, and the OpenTelemetry Operator
 - Host tools: Helm, kubectl, k9s, lazydocker, Trivy, Ghostty, OBS Studio, the latest official GIMP, Blender, Krita, and Inkscape releases, Neovim, pyenv, rbenv, ruby-build, nvm, tfenv, goenv, rustup, and MesloLGS Nerd Font
+- A Pango-backed KMS console on `tty2` for broad Unicode and emoji fallback, with the kernel console retained on `tty1` and the remaining VTs
 - GitLab CE and a Docker-executor GitLab Runner
 - Vault dev server, Eventline GoAWS SNS/SQS emulator, MinIO object storage, SeaweedFS S3 object storage, Mailpit, Keycloak, Keystone, Playwright, and Postgres containers
 - Prometheus, Grafana, Loki, Jaeger v2, OpenTelemetry Collector, node-exporter, cAdvisor, registry metrics, and Postgres exporters
@@ -366,6 +367,11 @@ GitHub Pages publishing is configured in `.github/workflows/docs.yml`.
 
 CoreDNS runs in Docker and binds `127.0.0.1:53` for host access. Service names are mapped to fixed addresses on the private Docker bridge defined by `devastation_subnets.services`, defaulting to `172.30.42.0/24`; the `devastation_dns_records` list is the source of truth for CoreDNS and `/etc/hosts`. Ansible also writes static `deva.station` entries to `/etc/hosts` by default so browser and CLI access work even on systems without `systemd-resolved`. If `systemd-resolved` is present, Ansible configures a drop-in at `/etc/systemd/resolved.conf.d/devastation.conf`, using split DNS for `deva.station`.
 
+Upstream DNS servers are discovered during convergence from active NetworkManager
+devices, with `/etc/resolv.conf` as a fallback. Loopback resolvers and CoreDNS's
+own address are rejected to prevent forwarding loops. Set
+`dns_upstream_resolvers` to a non-empty list to override discovery explicitly.
+
 Rollback:
 
 ```bash
@@ -431,11 +437,11 @@ MinIO is pinned to a known community image tag because current MinIO community i
 
 The host toolchain includes Helm, kubectl, K9s, Lazydocker, and Trivy. The KIND cluster is configured with the local registry trust and is bootstrapped with cert-manager, Istio, Argo CD, and the OpenTelemetry Operator when `kind_install_platform_addons` is enabled. By default, the KIND kubeconfig is exported to the target user's `~/.kube/config`, so `kubectl` and `k9s` use the `devastation` cluster without extra environment variables.
 
-Default versions are pinned in `group_vars/all.yml`: KIND `v0.23.0`, kubectl `v1.30.2`, node image `kindest/node:v1.30.0`, Helm `v4.2.0`, K9s `v0.50.18`, Lazydocker `0.25.0`, Trivy `0.70.0`, Istio `1.30.0`, Argo CD `v3.4.2`, and OpenTelemetry Operator `v0.151.0`. Ghostty uses the available apt package or the latest supported community Debian/Ubuntu package. OBS Studio, GIMP, Blender, Krita, and Inkscape deliberately are not pinned; they resolve the latest official stable x86_64 releases during convergence.
+Default versions are pinned in `group_vars/all.yml`: GitLab CE `19.2.4-ce.0`, GitLab Runner `alpine-v19.2.2`, KIND `v0.23.0`, kubectl `v1.30.2`, node image `kindest/node:v1.30.0`, Helm `v4.2.0`, K9s `v0.50.18`, Lazydocker `0.25.0`, Trivy `0.70.0`, Istio `1.30.0`, Argo CD `v3.4.2`, and OpenTelemetry Operator `v0.151.0`. Ghostty uses the available apt package or the latest supported community Debian/Ubuntu package. OBS Studio, GIMP, Blender, Krita, and Inkscape deliberately are not pinned; they resolve the latest official stable x86_64 releases during convergence.
 
 ## GitLab
 
-GitLab CE runs at `https://gitlab.deva.station` and exposes SSH directly at `gitlab.deva.station:22`. GitLab stores persistent data under `/srv/devastation/gitlab`.
+GitLab CE runs only on its fixed Docker-network address (`172.30.42.14` by default) at `https://gitlab.deva.station` and exposes SSH directly at `gitlab.deva.station:22`. It does not publish HTTP, HTTPS, or SSH ports on the host's wildcard addresses. GitLab stores persistent data under `/srv/devastation/gitlab`.
 
 Bootstrap disables the host SSH daemon by default (`host_sshd_enabled: false`) so port 22 behavior belongs to the named GitLab service instead of the workstation. Set `host_sshd_enabled: true` before bootstrap if this host must keep accepting direct SSH logins.
 
@@ -536,6 +542,8 @@ Dangerous options and sensitive defaults are explicit in `group_vars/all.yml`:
 - `gitlab_allow_existing_data`
 - `gitlab_migration_enabled`
 - `gitlab_runner_mount_docker_socket`
+- `gitlab_runner_docker_network_mode`
+- `gitlab_runner_auto_register`
 - `kind_install_platform_addons`
 - `vault_dev_root_token`
 - `postgres_default_password`

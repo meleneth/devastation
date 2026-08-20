@@ -33,6 +33,14 @@
     group: root
     mode: "0644"
 
+- name: Write GitLab Keycloak client reconciliation document
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/keycloak-gitlab-client.json.j2"
+    dest: "{{ devastation_paths.app_services }}/iam/gitlab-client.json"
+    owner: root
+    group: root
+    mode: "0600"
+
 - name: Write SeaweedFS S3 identity config
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../templates/seaweedfs-s3.json.j2"
@@ -102,6 +110,30 @@
     - { host: "keystone.{{ devastation_domain }}", port: 443 }
     - { host: "s3.{{ devastation_domain }}", port: 443 }
     - { host: "seaweed.{{ devastation_domain }}", port: 443 }
+
+- name: Reconcile GitLab client in the existing Keycloak realm
+  ansible.builtin.shell: |
+    set -euo pipefail
+    compose_file={{ devastation_paths.compose }}/compose.yml
+    kcadm=/opt/keycloak/bin/kcadm.sh
+    docker compose -f "$compose_file" exec -T iam "$kcadm" config credentials \
+      --server http://localhost:8080 --realm master \
+      --user {{ keycloak_admin_user | quote }} --password {{ keycloak_admin_password | quote }} >/dev/null
+    client_uuid="$(docker compose -f "$compose_file" exec -T iam "$kcadm" get clients \
+      -r {{ keycloak_realm | quote }} -q clientId={{ gitlab_oidc_client_id | quote }} \
+      --fields id --format csv --noquotes | tr -d '\r' | head -n 1)"
+    if [[ -n "$client_uuid" ]]; then
+      docker compose -f "$compose_file" exec -T iam "$kcadm" update "clients/$client_uuid" \
+        -r {{ keycloak_realm | quote }} -f - < {{ devastation_paths.app_services }}/iam/gitlab-client.json
+    else
+      docker compose -f "$compose_file" exec -T iam "$kcadm" create clients \
+        -r {{ keycloak_realm | quote }} -f - < {{ devastation_paths.app_services }}/iam/gitlab-client.json
+    fi
+  args:
+    executable: /bin/bash
+  changed_when: true
+  no_log: true
+  when: gitlab_oidc_enabled | bool
 
 - name: Install generated app support smoke scripts
   ansible.builtin.copy:
