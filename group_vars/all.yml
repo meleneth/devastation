@@ -452,6 +452,32 @@ helm_version: v4.2.0
 k9s_version: v0.50.18
 lazydocker_version: 0.25.0
 trivy_version: 0.70.0
+toolchains_enabled: true
+toolchains_install_root: /opt/devastation/toolchains
+toolchains_build_root: /srv/devastation/toolchain-build
+toolchain_build_jobs: "{{ ansible_processor_vcpus | default(2) }}"
+toolchain_build_packages:
+  - bison
+  - cmake
+  - flex
+  - libgmp-dev
+  - libisl-dev
+  - libmpc-dev
+  - libmpfr-dev
+  - ninja-build
+  - texinfo
+  - zlib1g-dev
+gcc_toolchain_enabled: true
+gcc_version: 16.2.0
+gcc_toolchain_path: "{{ toolchains_install_root }}/gcc-16.2"
+gcc_source_url: "https://gcc.gnu.org/pub/gcc/releases/gcc-{{ gcc_version }}/gcc-{{ gcc_version }}.tar.xz"
+clang_toolchain_enabled: true
+clang_version: 22.1.6
+clang_toolchain_path: "{{ toolchains_install_root }}/clang-{{ clang_version }}"
+clang_build_type: Release
+clang_source_url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-{{ clang_version }}/llvm-project-{{ clang_version }}.src.tar.xz"
+codex_global_toolchain_guidance_enabled: true
+codex_home: "{{ user_setup_home }}/.codex"
 ghostty_install_enabled: true
 ghostty_community_deb_enabled: true
 ghostty_community_release_api: https://api.github.com/repos/mkasberg/ghostty-ubuntu/releases/latest

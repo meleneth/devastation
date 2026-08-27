@@ -1,0 +1,197 @@
+---
+- name: Assert optional toolchain architecture support
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture == "x86_64"
+    fail_msg: "The optional GCC and Clang source builds currently support x86_64 hosts only."
+  when: toolchains_enabled | bool
+
+- name: Install optional toolchain build dependencies
+  ansible.builtin.apt:
+    name: "{{ toolchain_build_packages }}"
+    state: present
+    lock_timeout: "{{ apt_lock_timeout | int }}"
+  when: toolchains_enabled | bool
+
+- name: Create optional toolchain directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ toolchains_install_root }}"
+    - "{{ toolchains_build_root }}"
+  when: toolchains_enabled | bool
+
+- name: Download GCC source archive
+  ansible.builtin.get_url:
+    url: "{{ gcc_source_url }}"
+    dest: "{{ toolchains_build_root }}/gcc-{{ gcc_version }}.tar.xz"
+    mode: "0644"
+  when:
+    - toolchains_enabled | bool
+    - gcc_toolchain_enabled | bool
+
+- name: Extract GCC source
+  ansible.builtin.unarchive:
+    src: "{{ toolchains_build_root }}/gcc-{{ gcc_version }}.tar.xz"
+    dest: "{{ toolchains_build_root }}"
+    remote_src: true
+    creates: "{{ toolchains_build_root }}/gcc-{{ gcc_version }}/configure"
+  when:
+    - toolchains_enabled | bool
+    - gcc_toolchain_enabled | bool
+
+- name: Create GCC build directory
+  ansible.builtin.file:
+    path: "{{ toolchains_build_root }}/gcc-{{ gcc_version }}-build"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - toolchains_enabled | bool
+    - gcc_toolchain_enabled | bool
+
+- name: Check GCC installation
+  ansible.builtin.stat:
+    path: "{{ gcc_toolchain_path }}/bin/gcc"
+  register: gcc_toolchain_binary
+  when:
+    - toolchains_enabled | bool
+    - gcc_toolchain_enabled | bool
+
+- name: Configure GCC
+  ansible.builtin.command:
+    argv:
+      - "{{ toolchains_build_root }}/gcc-{{ gcc_version }}/configure"
+      - "--prefix={{ gcc_toolchain_path }}"
+      - --disable-multilib
+      - --enable-languages=c,c++
+      - --enable-checking=release
+  args:
+    chdir: "{{ toolchains_build_root }}/gcc-{{ gcc_version }}-build"
+    creates: "{{ toolchains_build_root }}/gcc-{{ gcc_version }}-build/Makefile"
+  when:
+    - toolchains_enabled | bool
+    - gcc_toolchain_enabled | bool
+
+- name: Build GCC
+  ansible.builtin.command:
+    argv:
+      - make
+      - "-j{{ toolchain_build_jobs }}"
+  args:
+    chdir: "{{ toolchains_build_root }}/gcc-{{ gcc_version }}-build"
+  when:
+    - toolchains_enabled | bool
+    - gcc_toolchain_enabled | bool
+    - not gcc_toolchain_binary.stat.exists
+
+- name: Install GCC
+  ansible.builtin.command:
+    argv:
+      - make
+      - install
+  args:
+    chdir: "{{ toolchains_build_root }}/gcc-{{ gcc_version }}-build"
+  when:
+    - toolchains_enabled | bool
+    - gcc_toolchain_enabled | bool
+    - not gcc_toolchain_binary.stat.exists
+
+- name: Download latest-release LLVM source archive
+  ansible.builtin.get_url:
+    url: "{{ clang_source_url }}"
+    dest: "{{ toolchains_build_root }}/llvm-project-{{ clang_version }}.src.tar.xz"
+    mode: "0644"
+  when:
+    - toolchains_enabled | bool
+    - clang_toolchain_enabled | bool
+
+- name: Extract latest-release LLVM source
+  ansible.builtin.unarchive:
+    src: "{{ toolchains_build_root }}/llvm-project-{{ clang_version }}.src.tar.xz"
+    dest: "{{ toolchains_build_root }}"
+    remote_src: true
+    creates: "{{ toolchains_build_root }}/llvm-project-{{ clang_version }}.src/llvm/CMakeLists.txt"
+  when:
+    - toolchains_enabled | bool
+    - clang_toolchain_enabled | bool
+
+- name: Check latest-release Clang installation
+  ansible.builtin.stat:
+    path: "{{ clang_toolchain_path }}/bin/clang"
+  register: clang_toolchain_binary
+  when:
+    - toolchains_enabled | bool
+    - clang_toolchain_enabled | bool
+
+- name: Configure latest-release Clang
+  ansible.builtin.command:
+    argv:
+      - cmake
+      - -S
+      - "{{ toolchains_build_root }}/llvm-project-{{ clang_version }}.src/llvm"
+      - -B
+      - "{{ toolchains_build_root }}/llvm-project-{{ clang_version }}-build"
+      - -G
+      - Ninja
+      - "-DCMAKE_BUILD_TYPE={{ clang_build_type }}"
+      - "-DCMAKE_INSTALL_PREFIX={{ clang_toolchain_path }}"
+      - "-DLLVM_ENABLE_PROJECTS=clang;lld;clang-tools-extra"
+      - -DLLVM_TARGETS_TO_BUILD=X86
+      - -DLLVM_ENABLE_ASSERTIONS=ON
+  when:
+    - toolchains_enabled | bool
+    - clang_toolchain_enabled | bool
+    - not clang_toolchain_binary.stat.exists
+
+- name: Build and install latest-release Clang
+  ansible.builtin.command:
+    argv:
+      - cmake
+      - --build
+      - "{{ toolchains_build_root }}/llvm-project-{{ clang_version }}-build"
+      - --target
+      - install
+      - --parallel
+      - "{{ toolchain_build_jobs | string }}"
+  when:
+    - toolchains_enabled | bool
+    - clang_toolchain_enabled | bool
+    - not clang_toolchain_binary.stat.exists
+
+- name: Create Codex home for the target user
+  ansible.builtin.file:
+    path: "{{ codex_home }}"
+    state: directory
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0755"
+  when: codex_global_toolchain_guidance_enabled | bool
+
+- name: Document optional toolchains in global Codex guidance
+  ansible.builtin.blockinfile:
+    path: "{{ codex_home }}/AGENTS.md"
+    create: true
+    owner: "{{ devastation_user }}"
+    group: "{{ devastation_user }}"
+    mode: "0644"
+    marker: "<!-- {mark} DEVASTATION OPTIONAL TOOLCHAINS -->"
+    block: |
+      # Optional C/C++ Toolchains
+
+      The host provides newer opt-in C/C++ toolchains. Do not make either one the
+      system default and do not modify `update-alternatives` for them.
+
+      - GCC {{ gcc_version }}: `{{ gcc_toolchain_path }}`
+        Use `CC={{ gcc_toolchain_path }}/bin/gcc CXX={{ gcc_toolchain_path }}/bin/g++`.
+      - Latest-release Clang {{ clang_version }}: `{{ clang_toolchain_path }}`
+        Use `CC={{ clang_toolchain_path }}/bin/clang CXX={{ clang_toolchain_path }}/bin/clang++`.
+
+      Prefer a repository's requested compiler. Use these toolchains only when a
+      task calls for that compiler/version or when testing against newer compilers.
+  when: codex_global_toolchain_guidance_enabled | bool

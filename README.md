@@ -352,6 +352,16 @@ GOPROXY=http://go-cache.deva.station:3002 go mod download
 
 Share [AGENTS.md](AGENTS.md) with coding agents so they use the local caches instead of going directly to public package registries.
 
+The bootstrap also builds opt-in C/C++ toolchains under `/opt/devastation/toolchains`:
+
+- GCC 16.2.0 at `/opt/devastation/toolchains/gcc-16.2`
+- latest-release Clang 22.1.6 at `/opt/devastation/toolchains/clang-22.1.6`
+
+They are not added to the system `PATH` or registered with `update-alternatives`.
+Select one per build with `CC` and `CXX`. The toolchains role records those paths
+in the target user's `~/.codex/AGENTS.md`, inside a managed block that preserves
+any other global Codex instructions.
+
 ## Project Docs
 
 User-facing runbooks live under `docs/` and are built with VitePress. They cover GitLab first-run tasks, runner registration, Vault usage, TeamCity, and the SNS/SQS/S3-style local services. Bootstrap publishes the built docs into the local portal at `https://deva.station/docs/` and `https://www.deva.station/docs/`.

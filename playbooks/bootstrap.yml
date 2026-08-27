@@ -80,6 +80,10 @@
       ansible.builtin.import_role:
         name: dev_tools
 
+    - name: Apply optional C and C++ toolchains role
+      ansible.builtin.import_role:
+        name: toolchains
+
     - name: Apply user language toolchains role
       ansible.builtin.import_role:
         name: user_setup
