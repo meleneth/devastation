@@ -1,5 +1,6 @@
 {
   "dns": ["{{ docker_daemon_dns }}"],
+  "bip": "{{ docker_bridge_cidr }}",
   "features": {
     "buildkit": true
   }{% if docker_registry_mirrors | default([]) | length > 0 %},

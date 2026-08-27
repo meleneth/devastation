@@ -76,6 +76,10 @@ check "workload CA bundle" test -s "{{ devastation_paths.workload_trust }}/ca-ce
 check "ephemeral CA private key absent" run_root test ! -e "{{ devastation_paths.ca }}/root-ca.key" || status=1
 check "certificate universe verifies" run_root "{{ ca_rotation_script }}" --verify-only || status=1
 check "Docker running" docker info || status=1
+check "Docker default network resolves external DNS" docker run --rm alpine:3.20 getent hosts packages.microsoft.com || status=1
+{% if apt_cache_transparent_enabled %}
+check "Docker default network uses transparent apt DNS" bash -c "docker run --rm alpine:3.20 getent hosts deb.debian.org | grep -Fq '{{ devastation_subnets.apt_cache_transparent }}'" || status=1
+{% endif %}
 {% if not host_sshd_enabled %}
 check "host SSH daemon disabled" bash -c "! systemctl is-active --quiet ssh.service && ! systemctl is-active --quiet sshd.service" || status=1
 {% endif %}

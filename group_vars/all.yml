@@ -305,7 +305,12 @@ install_nodejs_from_distro: true
 install_docker_engine: true
 docker_users:
   - "{{ devastation_user }}"
-docker_daemon_dns: "{{ devastation_subnets.dns }}"
+# Default/build-network containers cannot route directly to a container IP on
+# the separate devastation bridge. Publish CoreDNS on the host-side docker0
+# gateway and give that reachable address to the daemon instead.
+docker_bridge_gateway: 172.17.0.1
+docker_bridge_cidr: 172.17.0.1/16
+docker_daemon_dns: "{{ docker_bridge_gateway }}"
 docker_registry_mirrors:
   - "http://registry-cache.{{ devastation_domain }}:5000"
 docker_insecure_registries:

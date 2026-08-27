@@ -16,6 +16,8 @@ services:
     ports:
       - "127.0.0.1:53:53/udp"
       - "127.0.0.1:53:53/tcp"
+      - "{{ docker_daemon_dns }}:53:53/udp"
+      - "{{ docker_daemon_dns }}:53:53/tcp"
     networks:
       devastation:
         ipv4_address: {{ devastation_subnets.dns }}
