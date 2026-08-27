@@ -79,7 +79,7 @@ check "Docker running" docker info || status=1
 check "Docker default network resolves external DNS" docker run --rm alpine:3.20 getent hosts packages.microsoft.com || status=1
 {% if apt_cache_transparent_enabled %}
 check "Docker default network uses transparent apt DNS" bash -c "docker run --rm alpine:3.20 getent hosts deb.debian.org | grep -Fq '{{ docker_daemon_dns }}'" || status=1
-check "Docker default network reaches transparent apt" docker run --rm alpine:3.20 wget -qO /dev/null http://deb.debian.org/debian/dists/stable/Release || status=1
+check "Docker default network reaches transparent apt" docker run --rm alpine:3.20 wget -T 15 -t 1 -qO /dev/null http://deb.debian.org/debian/dists/stable/Release || status=1
 {% endif %}
 {% if not host_sshd_enabled %}
 check "host SSH daemon disabled" bash -c "! systemctl is-active --quiet ssh.service && ! systemctl is-active --quiet sshd.service" || status=1

@@ -1,4 +1,11 @@
 ---
+- name: Restart CoreDNS
+  community.docker.docker_compose_v2:
+    project_src: "{{ devastation_paths.compose }}"
+    services:
+      - dns
+    state: restarted
+
 - name: Restart systemd-resolved
   ansible.builtin.service:
     name: systemd-resolved

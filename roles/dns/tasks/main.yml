@@ -71,6 +71,7 @@
     owner: root
     group: root
     mode: "0644"
+  notify: Restart CoreDNS
 
 - name: Write shared Docker Compose file
   ansible.builtin.template:
