@@ -95,6 +95,8 @@ services:
       - apt-cache
     volumes:
       - {{ devastation_paths.apt_cache }}/transparent-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "{{ docker_daemon_dns }}:{{ apt_cache_transparent_port }}:{{ apt_cache_transparent_port }}"
     networks:
       devastation:
         ipv4_address: {{ devastation_subnets.apt_cache_transparent }}
