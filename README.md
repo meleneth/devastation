@@ -328,7 +328,12 @@ The environment also runs local proxy caches for common language ecosystems:
 - Rust: `sparse+http://cargo-cache.deva.station:8084/index/` using an nginx-backed crates.io sparse index and crate cache
 - Go: `http://go-cache.deva.station:3002` using Athens
 
-The `user_setup` role applies these automatically by default. Use these manually in local shells or automation that has not been bootstrapped yet:
+The `user_setup` role applies these automatically on the host by default.
+RubyGems.org is also transparently redirected through Gemstash for Docker
+runtime containers and BuildKit steps; the Docker execution layer mounts the
+combined public/Devastation CA bundle, so projects do not need cache-specific
+Dockerfile instructions. Use these settings manually only in clients that are
+outside the managed host and Docker execution paths:
 
 ```bash
 npm config set registry http://npm-cache.deva.station:4873
@@ -349,6 +354,19 @@ gem install rake --source http://gem-cache.deva.station:9292
 CARGO_REGISTRIES_CRATES_IO_INDEX=sparse+http://cargo-cache.deva.station:8084/index/ cargo fetch
 GOPROXY=http://go-cache.deva.station:3002 go mod download
 ```
+
+Inspect all package caches with a terminal dashboard showing artifact counts,
+allocated disk space, and age/staleness distributions:
+
+```bash
+bin/devastation-cache-stats
+bin/devastation-cache-stats --stale-days 30
+bin/devastation-cache-stats --json
+```
+
+Run it with `sudo` if the summary reports partial data for cache directories
+owned by a container. `DEVASTATION_ROOT` or `--root` can point it at another
+persistent-data tree.
 
 Share [AGENTS.md](AGENTS.md) with coding agents so they use the local caches instead of going directly to public package registries.
 

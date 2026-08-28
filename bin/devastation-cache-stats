@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""Terminal dashboard for Devastation's persistent package caches."""
+
+from __future__ import annotations
+
+import argparse
+import fnmatch
+import json
+import os
+import shutil
+import sys
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class Cache:
+    name: str
+    kind: str
+    relative_path: str
+    patterns: tuple[str, ...]
+    count_mode: str = "files"
+
+
+CACHES = (
+    Cache("Docker Hub", "container", "registry/pull-through-cache", ("*/_manifests/tags/*/current/link",)),
+    Cache("APT", "os", "apt-cache/data", ("*.deb", "*.udeb")),
+    Cache("npm", "language", "package-caches/verdaccio/storage", ("*.tgz",)),
+    Cache("PyPI", "language", "package-caches/devpi/data", ("*.whl", "*.tar.gz", "*.zip", "*.egg")),
+    # Gemstash stores the payload in a file literally named `gem`, below a
+    # resource-specific directory, rather than preserving the .gem suffix.
+    Cache("RubyGems", "language", "package-caches/gemstash/data", ("gem",)),
+    # nginx gives cached response bodies opaque names, so each regular cache file is an object.
+    Cache("Cargo", "language", "package-caches/cargo/data/crates", ("*",)),
+    Cache("Go modules", "language", "package-caches/athens/data", ("source.zip",)),
+)
+
+
+@dataclass
+class Stats:
+    name: str
+    kind: str
+    path: str
+    artifacts: int
+    bytes: int
+    fresh: int
+    aging: int
+    stale: int
+    newest_age_seconds: int | None
+    oldest_age_seconds: int | None
+    inaccessible: bool
+
+
+def matches(path: Path, root: Path, patterns: tuple[str, ...]) -> bool:
+    rel = path.relative_to(root).as_posix()
+    return any(fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(path.name, pattern) for pattern in patterns)
+
+
+def scan(cache: Cache, root: Path, stale_days: int, now: float) -> Stats:
+    path = root / cache.relative_path
+    artifacts = size = fresh = aging = stale = 0
+    newest: float | None = None
+    oldest: float | None = None
+    inaccessible = not path.exists()
+    stale_seconds = stale_days * 86400
+
+    def denied(_error: OSError) -> None:
+        nonlocal inaccessible
+        inaccessible = True
+
+    if path.exists():
+        for directory, _dirs, files in os.walk(path, onerror=denied):
+            for filename in files:
+                item = Path(directory) / filename
+                try:
+                    stat = item.stat()
+                except (OSError, PermissionError):
+                    inaccessible = True
+                    continue
+                # st_blocks reflects space actually allocated; fall back for non-POSIX filesystems.
+                size += stat.st_blocks * 512 if hasattr(stat, "st_blocks") else stat.st_size
+                if not matches(item, path, cache.patterns):
+                    continue
+                artifacts += 1
+                age = max(0.0, now - stat.st_mtime)
+                newest = age if newest is None else min(newest, age)
+                oldest = age if oldest is None else max(oldest, age)
+                if age >= stale_seconds:
+                    stale += 1
+                elif age >= stale_seconds / 2:
+                    aging += 1
+                else:
+                    fresh += 1
+
+    return Stats(cache.name, cache.kind, str(path), artifacts, size, fresh, aging, stale,
+                 None if newest is None else int(newest), None if oldest is None else int(oldest), inaccessible)
+
+
+def human_bytes(value: int) -> str:
+    amount = float(value)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if amount < 1024 or unit == "TiB":
+            return f"{amount:.0f} {unit}" if unit == "B" else f"{amount:.1f} {unit}"
+        amount /= 1024
+    raise AssertionError
+
+
+def human_age(seconds: int | None) -> str:
+    if seconds is None:
+        return "—"
+    for divisor, suffix in ((86400, "d"), (3600, "h"), (60, "m")):
+        if seconds >= divisor:
+            return f"{seconds // divisor}{suffix}"
+    return f"{seconds}s"
+
+
+def paint(enabled: bool, code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if enabled else text
+
+
+def bar(value: int, maximum: int, width: int, glyph: str = "█") -> str:
+    filled = 0 if maximum <= 0 else round(width * value / maximum)
+    return glyph * filled + "░" * (width - filled)
+
+
+def render(rows: list[Stats], stale_days: int, color: bool) -> None:
+    terminal_width = shutil.get_terminal_size((100, 24)).columns
+    graph_width = max(10, min(30, terminal_width - 68))
+    total_size = sum(row.bytes for row in rows)
+    total_artifacts = sum(row.artifacts for row in rows)
+    max_size = max((row.bytes for row in rows), default=0)
+    max_count = max((row.artifacts for row in rows), default=0)
+    title = " DEVASTATION CACHE ATLAS "
+    print(paint(color, "1;36", title.center(min(terminal_width, 110), "═")))
+    print(f" {len(rows)} caches  ·  {total_artifacts:,} cached artifacts  ·  {human_bytes(total_size)} allocated")
+    print()
+    print(paint(color, "1", f" {'CACHE':<13} {'ARTIFACTS':>10}  {'COUNT':<{graph_width}}  {'DISK':>10}  SIZE"))
+    for row in rows:
+        warning = " !" if row.inaccessible else ""
+        count_graph = paint(color, "36", bar(row.artifacts, max_count, graph_width))
+        size_graph = paint(color, "35", bar(row.bytes, max_size, graph_width))
+        print(f" {row.name:<13} {row.artifacts:>10,}  {count_graph}  {human_bytes(row.bytes):>10}{warning}")
+        print(f" {'':<13} {'':>10}  {size_graph}  {'':>10}")
+    print()
+    print(paint(color, "1", f" STALENESS  (aging ≥ {stale_days / 2:g}d · stale ≥ {stale_days}d)"))
+    print(f" {'CACHE':<13} {'FRESH':>9} {'AGING':>9} {'STALE':>9}  {'NEWEST':>8} {'OLDEST':>8}  DISTRIBUTION")
+    for row in rows:
+        total = max(1, row.artifacts)
+        fw = round(graph_width * row.fresh / total)
+        aw = round(graph_width * row.aging / total)
+        sw = max(0, graph_width - fw - aw) if row.artifacts else 0
+        graph = (paint(color, "32", "█" * fw) + paint(color, "33", "▓" * aw) +
+                 paint(color, "31", "▒" * sw) + "░" * (graph_width - fw - aw - sw))
+        print(f" {row.name:<13} {row.fresh:>9,} {row.aging:>9,} {row.stale:>9,}  "
+              f"{human_age(row.newest_age_seconds):>8} {human_age(row.oldest_age_seconds):>8}  {graph}")
+    inaccessible = [row.name for row in rows if row.inaccessible]
+    if inaccessible:
+        print()
+        print(paint(color, "33", " ! Partial data: unreadable or missing paths for " + ", ".join(inaccessible) + ". Try sudo."))
+    print(paint(color, "2", " Counts: image tags, .deb/.udeb, npm tarballs, Python archives, gems, Cargo objects, Go module zips."))
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", default=os.environ.get("DEVASTATION_ROOT", "/srv/devastation"),
+                        help="persistent data root (default: %(default)s)")
+    parser.add_argument("--stale-days", type=int, default=90, help="age considered stale (default: %(default)s)")
+    parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    parser.add_argument("--no-color", action="store_true", help="disable ANSI colors")
+    args = parser.parse_args()
+    if args.stale_days <= 0:
+        parser.error("--stale-days must be positive")
+    rows = [scan(cache, Path(args.root), args.stale_days, time.time()) for cache in CACHES]
+    if args.json:
+        print(json.dumps({"root": args.root, "stale_days": args.stale_days,
+                          "generated_at": int(time.time()), "caches": [asdict(row) for row in rows]}, indent=2))
+    else:
+        render(rows, args.stale_days, not args.no_color and sys.stdout.isatty() and os.environ.get("NO_COLOR") is None)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

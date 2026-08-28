@@ -13,6 +13,37 @@
     state: directory
     mode: "0755"
 
+- name: Install Docker workload-trust runtime shim
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/devastation-runc.py.j2"
+    dest: "{{ docker_runc_shim_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: docker_workload_trust_injection_enabled | bool
+  notify: Restart docker
+
+- name: Ensure Docker service override directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: docker_workload_trust_injection_enabled | bool
+
+- name: Put the workload-trust runtime shim first in Docker's PATH
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../templates/docker-devastation-runtime.conf.j2"
+    dest: /etc/systemd/system/docker.service.d/devastation-runtime.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: docker_workload_trust_injection_enabled | bool
+  notify:
+    - Reload systemd
+    - Restart docker
+
 - name: Configure Docker daemon DNS and registry trust posture
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../templates/docker-daemon.json.j2"

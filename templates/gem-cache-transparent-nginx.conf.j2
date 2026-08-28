@@ -1,0 +1,36 @@
+server {
+    listen {{ gem_cache_transparent_port }} ssl;
+    server_name rubygems.org;
+
+    ssl_certificate /certs/tls.crt;
+    ssl_certificate_key /certs/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location / {
+        proxy_set_header Host rubygems.org;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_pass http://gem-cache:{{ gem_cache_port }};
+    }
+}
+
+# Gemstash deliberately redirects compact-index requests to
+# index.rubygems.org. Forward those metadata requests to the real index while
+# gem payloads continue through Gemstash above.
+server {
+    listen {{ gem_cache_transparent_port }} ssl;
+    server_name index.rubygems.org;
+
+    ssl_certificate /certs/tls.crt;
+    ssl_certificate_key /certs/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    resolver {{ dns_effective_upstream_resolvers | join(' ') }} valid=30s ipv6=off;
+    set $index_upstream index.rubygems.org;
+
+    location / {
+        proxy_set_header Host index.rubygems.org;
+        proxy_ssl_server_name on;
+        proxy_ssl_name index.rubygems.org;
+        proxy_pass https://$index_upstream$request_uri;
+    }
+}

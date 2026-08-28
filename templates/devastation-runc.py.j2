@@ -1,0 +1,73 @@
+#!/usr/bin/python3
+"""Inject Devastation's public CA bundle into Docker and BuildKit sandboxes."""
+
+import json
+import os
+import sys
+import tempfile
+
+
+REAL_RUNC = "/usr/sbin/runc"
+TRUST_SOURCE = "{{ devastation_paths.workload_trust }}"
+TRUST_TARGET = "/etc/devastation"
+
+
+def bundle_path(arguments: list[str]) -> str | None:
+    for index, argument in enumerate(arguments):
+        if argument in ("--bundle", "-b") and index + 1 < len(arguments):
+            return arguments[index + 1]
+        if argument.startswith("--bundle="):
+            return argument.split("=", 1)[1]
+    return None
+
+
+def inject(arguments: list[str]) -> None:
+    bundle = bundle_path(arguments)
+    if bundle is None or not os.path.isdir(TRUST_SOURCE):
+        return
+
+    config_path = os.path.join(bundle, "config.json")
+    try:
+        with open(config_path, encoding="utf-8") as config_file:
+            config = json.load(config_file)
+    except FileNotFoundError:
+        return
+
+    mounts = config.setdefault("mounts", [])
+    if not any(mount.get("destination") == TRUST_TARGET for mount in mounts):
+        mounts.append({
+            "destination": TRUST_TARGET,
+            "type": "bind",
+            "source": TRUST_SOURCE,
+            "options": ["rbind", "ro", "nosuid", "nodev", "noexec"],
+        })
+
+    process_environment = config.setdefault("process", {}).setdefault("env", [])
+    defaults = {
+        "SSL_CERT_FILE": f"{TRUST_TARGET}/ca-certificates.crt",
+        "BUNDLE_SSL_CA_CERT": f"{TRUST_TARGET}/ca-certificates.crt",
+    }
+    existing = {entry.split("=", 1)[0] for entry in process_environment}
+    process_environment.extend(
+        f"{name}={value}" for name, value in defaults.items() if name not in existing
+    )
+
+    descriptor, temporary_path = tempfile.mkstemp(prefix=".config.", dir=bundle)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as temporary_file:
+            json.dump(config, temporary_file, separators=(",", ":"))
+        os.replace(temporary_path, config_path)
+    finally:
+        if os.path.exists(temporary_path):
+            os.unlink(temporary_path)
+
+
+def main() -> None:
+    arguments = sys.argv[1:]
+    if "create" in arguments or "run" in arguments:
+        inject(arguments)
+    os.execv(REAL_RUNC, [REAL_RUNC, *arguments])
+
+
+if __name__ == "__main__":
+    main()

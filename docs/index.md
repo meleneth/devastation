@@ -2,6 +2,9 @@
 
 `devastation` converges a Debian-family machine into a local development environment under the `deva.station` DNS root.
 
+The environment's testable behavioral contract is in the
+[requirements](requirements.md).
+
 Start here after running:
 
 ```bash

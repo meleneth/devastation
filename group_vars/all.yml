@@ -45,6 +45,7 @@ devastation_subnets:
   playwright: 172.30.42.44
   apt_cache_transparent: 172.30.42.45
   kitten_analysts: 172.30.42.46
+  gem_cache_transparent: 172.30.42.49
 
 devastation_dns_records:
   - name: "{{ devastation_domain }}"
@@ -311,6 +312,8 @@ docker_users:
 docker_bridge_gateway: 172.17.0.1
 docker_bridge_cidr: 172.17.0.1/16
 docker_daemon_dns: "{{ docker_bridge_gateway }}"
+docker_workload_trust_injection_enabled: true
+docker_runc_shim_path: /usr/local/sbin/runc
 docker_registry_mirrors:
   - "http://registry-cache.{{ devastation_domain }}:5000"
 docker_insecure_registries:
@@ -375,7 +378,11 @@ ca_leaf_certificates:
   - "keystone.{{ devastation_domain }}"
   - "s3.{{ devastation_domain }}"
   - "seaweed.{{ devastation_domain }}"
+  - rubygems-transparent
 ca_extra_leaf_certificates: []
+ca_intercepted_hostnames:
+  - rubygems.org
+  - index.rubygems.org
 cert_subject_country: US
 cert_valid_days: 825
 
@@ -427,6 +434,9 @@ pypi_cache_prefetch_packages:
 gem_cache_base_image: ruby:3.3-slim
 gem_cache_image: devastation/gemstash-cache:2.8.2
 gem_cache_port: 9292
+gem_cache_transparent_enabled: true
+gem_cache_transparent_port: 443
+gem_cache_repository_hostnames: "{{ ca_intercepted_hostnames }}"
 gemstash_version: 2.8.2
 gem_cache_upstream: https://rubygems.org
 gem_cache_prefetch_packages:

@@ -44,8 +44,6 @@ services:
 {% if registry_enable_auth %}
       - {{ devastation_paths.registry }}/auth:/auth:ro
 {% endif %}
-    ports:
-      - "443:443"
     networks:
       devastation:
         ipv4_address: {{ devastation_subnets.registry }}
@@ -139,6 +137,10 @@ services:
     <<: *devastation-trust
     image: {{ gem_cache_image }}
     restart: unless-stopped
+    dns:
+{% for resolver in dns_effective_upstream_resolvers %}
+      - {{ resolver }}
+{% endfor %}
     volumes:
       - {{ devastation_paths.package_caches }}/gemstash/config.yml:/gemstash/config.yml:ro
       - {{ devastation_paths.package_caches }}/gemstash/data:/gemstash/data
@@ -147,6 +149,23 @@ services:
     networks:
       devastation:
         ipv4_address: {{ devastation_subnets.gem_cache }}
+
+{% if gem_cache_transparent_enabled %}
+  gem-cache-transparent:
+    <<: *devastation-trust
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - gem-cache
+    volumes:
+      - {{ devastation_paths.package_caches }}/gemstash/transparent-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - {{ devastation_paths.certs }}/rubygems-transparent:/certs:ro
+    ports:
+      - "{{ docker_daemon_dns }}:{{ gem_cache_transparent_port }}:{{ gem_cache_transparent_port }}"
+    networks:
+      devastation:
+        ipv4_address: {{ devastation_subnets.gem_cache_transparent }}
+{% endif %}
 
   cargo-cache:
     <<: *devastation-trust
