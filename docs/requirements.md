@@ -30,4 +30,15 @@ inventories describe implementation; they do not replace these requirements.
 - Gem payloads must be visible in the persistent Gemstash data directory and in
   `bin/devastation-cache-stats` after the acceptance test.
 
+### npm — current implementation target
+
+- Host npm operations whose registry is npmjs.org must use the local Verdaccio
+  service without per-project configuration.
+- npm operations in supported Node.js containers must use Verdaccio without
+  modifying the project or its Dockerfile.
+- The acceptance test must cover an unmodified Node.js runtime container and an
+  unmodified `RUN npm pack ...` Docker build step.
+- npm tarballs must be visible in Verdaccio's persistent storage and in
+  `bin/devastation-cache-stats` after the acceptance test.
+
 Other language ecosystems will be specified and implemented separately.

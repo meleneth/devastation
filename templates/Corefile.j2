@@ -36,6 +36,18 @@
 
 {% endfor %}
 {% endif %}
+{% if npm_cache_transparent_enabled %}
+{% for hostname in npm_cache_repository_hostnames %}
+{{ hostname }}:53 {
+    errors
+    log
+    hosts {
+        {{ docker_daemon_dns }} {{ hostname }}
+    }
+}
+
+{% endfor %}
+{% endif %}
 .:53 {
     errors
     cache 30

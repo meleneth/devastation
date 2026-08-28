@@ -39,15 +39,15 @@
     group: root
     mode: "0644"
 
-- name: Write transparent RubyGems cache frontend configuration
+- name: Write transparent language cache frontend configuration
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../templates/gem-cache-transparent-nginx.conf.j2"
     dest: "{{ devastation_paths.package_caches }}/gemstash/transparent-nginx.conf"
     owner: root
     group: root
     mode: "0644"
-  when: gem_cache_transparent_enabled | bool
-  notify: Restart transparent RubyGems cache frontend
+  when: gem_cache_transparent_enabled | bool or npm_cache_transparent_enabled | bool
+  notify: Restart transparent language cache frontend
 
 - name: Write Cargo cache configuration
   ansible.builtin.template:
@@ -99,7 +99,7 @@
     services: >-
       {{
         ['npm-cache', 'pypi-cache', 'gem-cache', 'cargo-cache', 'go-cache']
-        + (['gem-cache-transparent'] if gem_cache_transparent_enabled else [])
+        + (['gem-cache-transparent'] if (gem_cache_transparent_enabled or npm_cache_transparent_enabled) else [])
       }}
     state: present
 
@@ -115,9 +115,9 @@
     - { host: "cargo-cache.{{ devastation_domain }}", port: "{{ cargo_cache_port }}" }
     - { host: "go-cache.{{ devastation_domain }}", port: "{{ go_cache_port }}" }
 
-- name: Wait for transparent RubyGems cache frontend
+- name: Wait for transparent language cache frontend
   ansible.builtin.wait_for:
     host: "{{ docker_daemon_dns }}"
     port: "{{ gem_cache_transparent_port }}"
     timeout: 60
-  when: gem_cache_transparent_enabled | bool
+  when: gem_cache_transparent_enabled | bool or npm_cache_transparent_enabled | bool

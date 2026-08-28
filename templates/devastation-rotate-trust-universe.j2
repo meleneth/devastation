@@ -35,6 +35,32 @@ INTERCEPTED_HOSTNAMES=(
 {% endfor %}
 )
 
+leaf_intercepted_hostnames() {
+  local leaf="$1"
+  case "$leaf" in
+{% for intercepted_certificate in ca_intercepted_certificates %}
+    "{{ intercepted_certificate.name }}")
+{% for hostname in intercepted_certificate.hostnames %}
+      printf '%s\n' "{{ hostname }}"
+{% endfor %}
+      ;;
+{% endfor %}
+  esac
+}
+
+leaf_allows_intercepted_hostname() {
+  local leaf="$1"
+  local hostname="$2"
+  case "${leaf}:${hostname}" in
+{% for intercepted_certificate in ca_intercepted_certificates %}
+{% for hostname in intercepted_certificate.hostnames %}
+    "{{ intercepted_certificate.name }}:{{ hostname }}") return 0 ;;
+{% endfor %}
+{% endfor %}
+    *) return 1 ;;
+  esac
+}
+
 LEAF_CERTS=(
 {% for cert_name in ca_leaf_certificates %}
   "{{ cert_name }}"
@@ -139,12 +165,11 @@ write_leaf_openssl_config() {
       printf 'DNS.%d = %s\n' "$i" "$host"
       i=$((i + 1))
     done
-    if [[ "$name" == "rubygems-transparent" ]]; then
-      for host in "${INTERCEPTED_HOSTNAMES[@]}"; do
-        printf 'DNS.%d = %s\n' "$i" "$host"
-        i=$((i + 1))
-      done
-    fi
+    while IFS= read -r host; do
+      [[ -n "$host" ]] || continue
+      printf 'DNS.%d = %s\n' "$i" "$host"
+      i=$((i + 1))
+    done < <(leaf_intercepted_hostnames "$name")
   } > "$config"
 }
 
@@ -184,18 +209,18 @@ verify_leaf_sans() {
   for host in "${INTERNAL_HOSTNAMES[@]}"; do
     grep -q "DNS:${host}" <<<"$cert_text"
   done
-  if [[ "$(basename "$(dirname "$cert")")" == "rubygems-transparent" ]]; then
-    for host in "${INTERCEPTED_HOSTNAMES[@]}"; do
+  local leaf_name
+  leaf_name="$(basename "$(dirname "$cert")")"
+  for host in "${INTERCEPTED_HOSTNAMES[@]}"; do
+    if leaf_allows_intercepted_hostname "$leaf_name" "$host"; then
       grep -q "DNS:${host}" <<<"$cert_text"
-    done
-  else
-    for host in "${INTERCEPTED_HOSTNAMES[@]}"; do
+    else
       if grep -q "DNS:${host}" <<<"$cert_text"; then
         echo "Unrelated leaf certificate contains intercepted hostname: ${host}" >&2
         return 1
       fi
-    done
-  fi
+    fi
+  done
 }
 
 generate_trust_universe() {

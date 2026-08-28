@@ -46,6 +46,7 @@ def inject(arguments: list[str]) -> None:
     defaults = {
         "SSL_CERT_FILE": f"{TRUST_TARGET}/ca-certificates.crt",
         "BUNDLE_SSL_CA_CERT": f"{TRUST_TARGET}/ca-certificates.crt",
+        "NODE_EXTRA_CA_CERTS": f"{TRUST_TARGET}/ca-certificates.crt",
     }
     existing = {entry.split("=", 1)[0] for entry in process_environment}
     process_environment.extend(

@@ -379,10 +379,20 @@ ca_leaf_certificates:
   - "s3.{{ devastation_domain }}"
   - "seaweed.{{ devastation_domain }}"
   - rubygems-transparent
+  - npm-transparent
 ca_extra_leaf_certificates: []
 ca_intercepted_hostnames:
   - rubygems.org
   - index.rubygems.org
+  - registry.npmjs.org
+ca_intercepted_certificates:
+  - name: rubygems-transparent
+    hostnames:
+      - rubygems.org
+      - index.rubygems.org
+  - name: npm-transparent
+    hostnames:
+      - registry.npmjs.org
 cert_subject_country: US
 cert_valid_days: 825
 
@@ -413,6 +423,9 @@ apt_cache_prefetch_images:
 npm_cache_image: verdaccio/verdaccio:6
 npm_cache_port: 4873
 npm_cache_upstream: https://registry.npmjs.org/
+npm_cache_transparent_enabled: true
+npm_cache_repository_hostnames:
+  - registry.npmjs.org
 npm_cache_prefetch_packages:
   - typescript
   - vite
@@ -436,7 +449,9 @@ gem_cache_image: devastation/gemstash-cache:2.8.2
 gem_cache_port: 9292
 gem_cache_transparent_enabled: true
 gem_cache_transparent_port: 443
-gem_cache_repository_hostnames: "{{ ca_intercepted_hostnames }}"
+gem_cache_repository_hostnames:
+  - rubygems.org
+  - index.rubygems.org
 gemstash_version: 2.8.2
 gem_cache_upstream: https://rubygems.org
 gem_cache_prefetch_packages:

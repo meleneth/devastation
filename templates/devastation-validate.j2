@@ -102,6 +102,10 @@ check "kmscon active on {{ kms_console_vt }}" systemctl is-active --quiet "kmsco
 check "tty1 kernel console recovery preserved" bash -c "systemctl is-enabled getty@tty1.service >/dev/null 2>&1 || systemctl is-active --quiet getty@tty1.service" || status=1
 {% endif %}
 check "npm cache reachable" curl -fsS "http://npm-cache.${DOMAIN}:{{ npm_cache_port }}/-/ping" || status=1
+{% if npm_cache_transparent_enabled %}
+check "Docker resolves npm through transparent cache" bash -c "docker run --rm alpine:3.20 getent hosts registry.npmjs.org | grep -Fq '{{ docker_daemon_dns }}'" || status=1
+check "stock Node container uses transparent npm cache" docker run --rm node:latest npm pack is-number --silent || status=1
+{% endif %}
 check "PyPI cache reachable" curl -fsSL "http://pypi-cache.${DOMAIN}:{{ pypi_cache_port }}/root/pypi/+simple/" || status=1
 check "RubyGems cache reachable" curl -fsS "http://gem-cache.${DOMAIN}:{{ gem_cache_port }}/" || status=1
 check "RubyGems cache uses persistent storage" bash -c "grep -Fqx ':base_path: /gemstash/data' '{{ devastation_paths.package_caches }}/gemstash/config.yml'" || status=1
@@ -206,6 +210,14 @@ FROM ruby:latest
 RUN gem fetch rake --silent
 DOCKERFILE
   check "stock Ruby build uses transparent RubyGems cache" docker build --no-cache "${tmp}/rubygems" || status=1
+{% endif %}
+{% if npm_cache_transparent_enabled %}
+  mkdir -p "${tmp}/npm"
+  cat >"${tmp}/npm/Dockerfile" <<'DOCKERFILE'
+FROM node:latest
+RUN npm pack is-number --silent
+DOCKERFILE
+  check "stock Node build uses transparent npm cache" docker build --no-cache "${tmp}/npm" || status=1
 {% endif %}
   cat >"${tmp}/Dockerfile" <<'DOCKERFILE'
 FROM alpine:3.20
