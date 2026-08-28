@@ -380,11 +380,13 @@ ca_leaf_certificates:
   - "seaweed.{{ devastation_domain }}"
   - rubygems-transparent
   - npm-transparent
+  - pypi-transparent
 ca_extra_leaf_certificates: []
 ca_intercepted_hostnames:
   - rubygems.org
   - index.rubygems.org
   - registry.npmjs.org
+  - pypi.org
 ca_intercepted_certificates:
   - name: rubygems-transparent
     hostnames:
@@ -393,6 +395,9 @@ ca_intercepted_certificates:
   - name: npm-transparent
     hostnames:
       - registry.npmjs.org
+  - name: pypi-transparent
+    hostnames:
+      - pypi.org
 cert_subject_country: US
 cert_valid_days: 825
 
@@ -437,6 +442,9 @@ pypi_cache_base_image: python:3.13-slim
 pypi_cache_image: devastation/devpi-cache:6.20.0
 pypi_cache_port: 3141
 pypi_cache_password: devastation
+pypi_cache_transparent_enabled: true
+pypi_cache_repository_hostnames:
+  - pypi.org
 devpi_server_version: 6.20.0
 pypi_cache_prefetch_packages:
   - pip

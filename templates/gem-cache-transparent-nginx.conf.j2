@@ -29,6 +29,39 @@ server {
     }
 }
 
+server {
+    listen {{ gem_cache_transparent_port }} ssl;
+    server_name pypi.org;
+
+    ssl_certificate /pypi-certs/tls.crt;
+    ssl_certificate_key /pypi-certs/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location /simple/ {
+        proxy_set_header Host pypi.org;
+        proxy_set_header X-Forwarded-Host pypi.org;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_pass http://pypi-cache:{{ pypi_cache_port }}/root/pypi/+simple/;
+    }
+
+    # Relative links from the remapped simple index resolve under /+f/ at the
+    # public origin; translate that content-addressed namespace back to devpi.
+    location /+f/ {
+        proxy_set_header Host pypi.org;
+        proxy_set_header X-Forwarded-Host pypi.org;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_pass http://pypi-cache:{{ pypi_cache_port }}/root/pypi/+f/;
+    }
+
+    # Keep devpi's native index namespace reachable for absolute links.
+    location /root/pypi/ {
+        proxy_set_header Host pypi.org;
+        proxy_set_header X-Forwarded-Host pypi.org;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_pass http://pypi-cache:{{ pypi_cache_port }};
+    }
+}
+
 # Gemstash deliberately redirects compact-index requests to
 # index.rubygems.org. Forward those metadata requests to the real index while
 # gem payloads continue through Gemstash above.

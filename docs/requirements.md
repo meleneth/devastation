@@ -41,4 +41,15 @@ inventories describe implementation; they do not replace these requirements.
 - npm tarballs must be visible in Verdaccio's persistent storage and in
   `bin/devastation-cache-stats` after the acceptance test.
 
+### PyPI — current implementation target
+
+- Host pip operations whose index is PyPI must use the local devpi service
+  without per-project configuration.
+- pip operations in supported Python containers must use devpi without
+  modifying the project or its Dockerfile.
+- The acceptance test must cover an unmodified Python runtime container and an
+  unmodified `RUN python -m pip download ...` Docker build step.
+- Python distributions must be visible in devpi's persistent storage and in
+  `bin/devastation-cache-stats` after the acceptance test.
+
 Other language ecosystems will be specified and implemented separately.

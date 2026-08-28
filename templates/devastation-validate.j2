@@ -107,6 +107,10 @@ check "Docker resolves npm through transparent cache" bash -c "docker run --rm a
 check "stock Node container uses transparent npm cache" docker run --rm node:latest npm pack is-number --silent || status=1
 {% endif %}
 check "PyPI cache reachable" curl -fsSL "http://pypi-cache.${DOMAIN}:{{ pypi_cache_port }}/root/pypi/+simple/" || status=1
+{% if pypi_cache_transparent_enabled %}
+check "Docker resolves PyPI through transparent cache" bash -c "docker run --rm alpine:3.20 getent hosts pypi.org | grep -Fq '{{ docker_daemon_dns }}'" || status=1
+check "stock Python container uses transparent PyPI cache" docker run --rm python:latest python -m pip download --no-deps --dest /tmp requests || status=1
+{% endif %}
 check "RubyGems cache reachable" curl -fsS "http://gem-cache.${DOMAIN}:{{ gem_cache_port }}/" || status=1
 check "RubyGems cache uses persistent storage" bash -c "grep -Fqx ':base_path: /gemstash/data' '{{ devastation_paths.package_caches }}/gemstash/config.yml'" || status=1
 {% if gem_cache_transparent_enabled %}
@@ -218,6 +222,14 @@ FROM node:latest
 RUN npm pack is-number --silent
 DOCKERFILE
   check "stock Node build uses transparent npm cache" docker build --no-cache "${tmp}/npm" || status=1
+{% endif %}
+{% if pypi_cache_transparent_enabled %}
+  mkdir -p "${tmp}/pypi"
+  cat >"${tmp}/pypi/Dockerfile" <<'DOCKERFILE'
+FROM python:latest
+RUN python -m pip download --no-deps --dest /tmp requests
+DOCKERFILE
+  check "stock Python build uses transparent PyPI cache" docker build --no-cache "${tmp}/pypi" || status=1
 {% endif %}
   cat >"${tmp}/Dockerfile" <<'DOCKERFILE'
 FROM alpine:3.20

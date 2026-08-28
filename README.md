@@ -333,7 +333,7 @@ The environment also runs local proxy caches for common language ecosystems:
 - Go: `http://go-cache.deva.station:3002` using Athens
 
 The `user_setup` role applies these automatically on the host by default.
-RubyGems.org and npmjs.org are also transparently redirected through their
+RubyGems.org, npmjs.org, and PyPI are also transparently redirected through their
 local caches for Docker runtime containers and BuildKit steps; the Docker
 execution layer mounts the combined public/Devastation CA bundle, so projects
 do not need cache-specific Dockerfile instructions. Use these settings manually

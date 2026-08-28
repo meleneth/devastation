@@ -8,6 +8,7 @@ import fnmatch
 import json
 import os
 import shutil
+import sqlite3
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -27,7 +28,9 @@ CACHES = (
     Cache("Docker Hub", "container", "registry/pull-through-cache", ("*/_manifests/tags/*/current/link",)),
     Cache("APT", "os", "apt-cache/data", ("*.deb", "*.udeb")),
     Cache("npm", "language", "package-caches/verdaccio/storage", ("*.tgz",)),
-    Cache("PyPI", "language", "package-caches/devpi/data", ("*.whl", "*.tar.gz", "*.zip", "*.egg")),
+    # devpi 6 stores cached distribution bodies and their STAGEFILE records in
+    # its SQLite keyfs database rather than as extension-bearing loose files.
+    Cache("PyPI", "language", "package-caches/devpi/data", (), "devpi-sqlite"),
     # Gemstash stores the payload in a file literally named `gem`, below a
     # resource-specific directory, rather than preserving the .gem suffix.
     Cache("RubyGems", "language", "package-caches/gemstash/data", ("gem",)),
@@ -92,6 +95,25 @@ def scan(cache: Cache, root: Path, stale_days: int, now: float) -> Stats:
                     aging += 1
                 else:
                     fresh += 1
+
+        if cache.count_mode == "devpi-sqlite":
+            database = path / ".sqlite"
+            try:
+                connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+                try:
+                    artifacts = connection.execute(
+                        "SELECT count(*) FROM kv WHERE keyname = 'STAGEFILE' "
+                        "AND key LIKE '%/+f/%'"
+                    ).fetchone()[0]
+                finally:
+                    connection.close()
+                database_age = max(0.0, now - database.stat().st_mtime)
+                newest = oldest = database_age if artifacts else None
+                fresh = artifacts if database_age < stale_seconds / 2 else 0
+                aging = artifacts if stale_seconds / 2 <= database_age < stale_seconds else 0
+                stale = artifacts if database_age >= stale_seconds else 0
+            except (OSError, PermissionError, sqlite3.Error):
+                inaccessible = True
 
     return Stats(cache.name, cache.kind, str(path), artifacts, size, fresh, aging, stale,
                  None if newest is None else int(newest), None if oldest is None else int(oldest), inaccessible)
