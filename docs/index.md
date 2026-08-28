@@ -5,6 +5,9 @@
 The environment's testable behavioral contract is in the
 [requirements](requirements.md).
 
+The implementation and operations of Docker/BuildKit package interception are
+documented in [transparent package caching](package-cache-transparency.md).
+
 Start here after running:
 
 ```bash

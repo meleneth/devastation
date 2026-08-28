@@ -320,6 +320,10 @@ If a package is unavailable offline, apt will fail clearly. Refresh the cache wh
 
 ## Language Package Caches
 
+See [Transparent package caching](docs/package-cache-transparency.md) for the
+Docker/BuildKit request flow, certificate scoping, trust injection, focused
+convergence, validation, and troubleshooting details.
+
 The environment also runs local proxy caches for common language ecosystems:
 
 - npm: `http://npm-cache.deva.station:4873` using Verdaccio
