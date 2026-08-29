@@ -83,3 +83,56 @@ server {
         proxy_pass https://$index_upstream$request_uri;
     }
 }
+
+{% if cargo_cache_transparent_enabled %}
+server {
+    listen {{ gem_cache_transparent_port }} ssl;
+    server_name index.crates.io;
+
+    ssl_certificate /cargo-index-certs/tls.crt;
+    ssl_certificate_key /cargo-index-certs/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location = /config.json {
+        default_type application/json;
+        return 200 '{"dl":"https://static.crates.io/crates","api":"https://crates.io"}';
+    }
+
+    location / {
+        proxy_set_header Host index.crates.io;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_pass http://cargo-cache:{{ cargo_cache_port }}/index/;
+    }
+}
+
+server {
+    listen {{ gem_cache_transparent_port }} ssl;
+    server_name static.crates.io;
+
+    ssl_certificate /cargo-static-certs/tls.crt;
+    ssl_certificate_key /cargo-static-certs/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location /crates/ {
+        proxy_set_header Host static.crates.io;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_pass http://cargo-cache:{{ cargo_cache_port }};
+    }
+}
+{% endif %}
+{% if go_cache_transparent_enabled %}
+server {
+    listen {{ gem_cache_transparent_port }} ssl;
+    server_name proxy.golang.org;
+
+    ssl_certificate /go-certs/tls.crt;
+    ssl_certificate_key /go-certs/tls.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    location / {
+        proxy_set_header Host proxy.golang.org;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_pass http://go-cache:{{ go_cache_port }};
+    }
+}
+{% endif %}

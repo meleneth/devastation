@@ -46,7 +46,7 @@
     owner: root
     group: root
     mode: "0644"
-  when: gem_cache_transparent_enabled | bool or npm_cache_transparent_enabled | bool or pypi_cache_transparent_enabled | bool
+  when: gem_cache_transparent_enabled | bool or npm_cache_transparent_enabled | bool or pypi_cache_transparent_enabled | bool or cargo_cache_transparent_enabled | bool or go_cache_transparent_enabled | bool
   notify: Restart transparent language cache frontend
 
 - name: Write Cargo cache configuration
@@ -99,7 +99,7 @@
     services: >-
       {{
         ['npm-cache', 'pypi-cache', 'gem-cache', 'cargo-cache', 'go-cache']
-        + (['gem-cache-transparent'] if (gem_cache_transparent_enabled or npm_cache_transparent_enabled or pypi_cache_transparent_enabled) else [])
+        + (['gem-cache-transparent'] if (gem_cache_transparent_enabled or npm_cache_transparent_enabled or pypi_cache_transparent_enabled or cargo_cache_transparent_enabled or go_cache_transparent_enabled) else [])
       }}
     state: present
 
@@ -120,4 +120,4 @@
     host: "{{ docker_daemon_dns }}"
     port: "{{ gem_cache_transparent_port }}"
     timeout: 60
-  when: gem_cache_transparent_enabled | bool or npm_cache_transparent_enabled | bool or pypi_cache_transparent_enabled | bool
+  when: gem_cache_transparent_enabled | bool or npm_cache_transparent_enabled | bool or pypi_cache_transparent_enabled | bool or cargo_cache_transparent_enabled | bool or go_cache_transparent_enabled | bool

@@ -1,0 +1,37 @@
+---
+- name: Converge transparent Go module caching
+  hosts: localhost
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../group_vars/all.yml
+
+  tasks:
+    - name: Apply Docker workload trust injection
+      ansible.builtin.import_role:
+        name: docker
+      tags: [docker]
+
+    - name: Restart Docker before trust and cache convergence
+      ansible.builtin.meta: flush_handlers
+
+    - name: Apply certificate authority role
+      ansible.builtin.import_role:
+        name: ca
+      tags: [ca]
+
+    - name: Publish updated host and workload trust
+      ansible.builtin.meta: flush_handlers
+
+    - name: Apply DNS interception
+      ansible.builtin.import_role:
+        name: dns
+      tags: [dns]
+
+    - name: Restart DNS before cache frontend convergence
+      ansible.builtin.meta: flush_handlers
+
+    - name: Apply package cache role
+      ansible.builtin.import_role:
+        name: package_caches
+      tags: [package_caches]

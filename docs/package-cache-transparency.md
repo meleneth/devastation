@@ -98,6 +98,7 @@ one cache path changed:
 ansible-playbook -i inventory/localhost.yml playbooks/rubygems-cache.yml
 ansible-playbook -i inventory/localhost.yml playbooks/npm-cache.yml
 ansible-playbook -i inventory/localhost.yml playbooks/pypi-cache.yml
+ansible-playbook -i inventory/localhost.yml playbooks/go-cache.yml
 ```
 
 Because rotation restarts Docker, unattended automation should launch the
@@ -106,7 +107,7 @@ restart.
 
 ## Shared TLS frontend
 
-Only one process can bind the Docker bridge gateway's port 443. RubyGems, npm, and PyPI
+Only one process can bind the Docker bridge gateway's port 443. RubyGems, npm, PyPI, Cargo, and Go
 therefore share `gem-cache-transparent`, despite its historical service name.
 nginx selects a certificate and backend by hostname.
 
@@ -145,14 +146,15 @@ Useful live checks:
 
 ```bash
 docker compose -f /srv/devastation/compose/compose.yml \
-  ps dns gem-cache-transparent gem-cache npm-cache pypi-cache
+  ps dns gem-cache-transparent gem-cache npm-cache pypi-cache cargo-cache go-cache
 
 docker compose -f /srv/devastation/compose/compose.yml \
-  logs -f gem-cache-transparent gem-cache npm-cache pypi-cache
+  logs -f gem-cache-transparent gem-cache npm-cache pypi-cache cargo-cache go-cache
 
 docker run --rm ruby:latest gem fetch rake --silent
 docker run --rm node:latest npm pack is-number --silent
 docker run --rm python:latest python -m pip download --no-deps --dest /tmp requests
+docker run --rm golang:latest go mod download github.com/google/uuid@v1.6.0
 ```
 
 The frontend access log is the clearest proof that an untouched client used the

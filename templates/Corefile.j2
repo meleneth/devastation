@@ -60,6 +60,30 @@
 
 {% endfor %}
 {% endif %}
+{% if cargo_cache_transparent_enabled %}
+{% for hostname in cargo_cache_repository_hostnames %}
+{{ hostname }}:53 {
+    errors
+    log
+    hosts {
+        {{ docker_daemon_dns }} {{ hostname }}
+    }
+}
+
+{% endfor %}
+{% endif %}
+{% if go_cache_transparent_enabled %}
+{% for hostname in go_cache_repository_hostnames %}
+{{ hostname }}:53 {
+    errors
+    log
+    hosts {
+        {{ docker_daemon_dns }} {{ hostname }}
+    }
+}
+
+{% endfor %}
+{% endif %}
 .:53 {
     errors
     cache 30

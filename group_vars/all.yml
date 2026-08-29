@@ -381,12 +381,18 @@ ca_leaf_certificates:
   - rubygems-transparent
   - npm-transparent
   - pypi-transparent
+  - cargo-index-transparent
+  - cargo-static-transparent
+  - go-transparent
 ca_extra_leaf_certificates: []
 ca_intercepted_hostnames:
   - rubygems.org
   - index.rubygems.org
   - registry.npmjs.org
   - pypi.org
+  - index.crates.io
+  - static.crates.io
+  - proxy.golang.org
 ca_intercepted_certificates:
   - name: rubygems-transparent
     hostnames:
@@ -398,6 +404,15 @@ ca_intercepted_certificates:
   - name: pypi-transparent
     hostnames:
       - pypi.org
+  - name: cargo-index-transparent
+    hostnames:
+      - index.crates.io
+  - name: cargo-static-transparent
+    hostnames:
+      - static.crates.io
+  - name: go-transparent
+    hostnames:
+      - proxy.golang.org
 cert_subject_country: US
 cert_valid_days: 825
 
@@ -468,6 +483,10 @@ gem_cache_prefetch_packages:
 
 cargo_cache_image: nginx:1.27-alpine
 cargo_cache_port: 8084
+cargo_cache_transparent_enabled: true
+cargo_cache_repository_hostnames:
+  - index.crates.io
+  - static.crates.io
 cargo_cache_prefetch_crates:
   - serde
   - tokio
@@ -475,6 +494,9 @@ cargo_cache_prefetch_crates:
 
 go_cache_image: gomods/athens:v0.17.1
 go_cache_port: 3002
+go_cache_transparent_enabled: true
+go_cache_repository_hostnames:
+  - proxy.golang.org
 go_cache_prefetch_modules:
   - golang.org/x/tools@latest
   - github.com/spf13/cobra@latest

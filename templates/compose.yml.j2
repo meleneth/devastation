@@ -157,7 +157,7 @@ services:
       devastation:
         ipv4_address: {{ devastation_subnets.gem_cache }}
 
-{% if gem_cache_transparent_enabled or npm_cache_transparent_enabled or pypi_cache_transparent_enabled %}
+{% if gem_cache_transparent_enabled or npm_cache_transparent_enabled or pypi_cache_transparent_enabled or cargo_cache_transparent_enabled or go_cache_transparent_enabled %}
   gem-cache-transparent:
     <<: *devastation-trust
     image: nginx:1.27-alpine
@@ -166,11 +166,16 @@ services:
       - gem-cache
       - npm-cache
       - pypi-cache
+      - cargo-cache
+      - go-cache
     volumes:
       - {{ devastation_paths.package_caches }}/gemstash/transparent-nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - {{ devastation_paths.certs }}/rubygems-transparent:/certs:ro
       - {{ devastation_paths.certs }}/npm-transparent:/npm-certs:ro
       - {{ devastation_paths.certs }}/pypi-transparent:/pypi-certs:ro
+      - {{ devastation_paths.certs }}/cargo-index-transparent:/cargo-index-certs:ro
+      - {{ devastation_paths.certs }}/cargo-static-transparent:/cargo-static-certs:ro
+      - {{ devastation_paths.certs }}/go-transparent:/go-certs:ro
     ports:
       - "{{ docker_daemon_dns }}:{{ gem_cache_transparent_port }}:{{ gem_cache_transparent_port }}"
     networks:

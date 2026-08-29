@@ -118,7 +118,16 @@ check "Docker resolves RubyGems through transparent cache" bash -c "docker run -
 check "stock Ruby container trusts transparent RubyGems cache" docker run --rm ruby:latest gem fetch rake --silent || status=1
 {% endif %}
 check "Cargo cache reachable" curl -fsS "http://cargo-cache.${DOMAIN}:{{ cargo_cache_port }}/health" || status=1
+{% if cargo_cache_transparent_enabled %}
+check "Docker resolves Cargo index through transparent cache" bash -c "docker run --rm alpine:3.20 getent hosts index.crates.io | grep -Fq '{{ docker_daemon_dns }}'" || status=1
+check "Docker resolves Cargo downloads through transparent cache" bash -c "docker run --rm alpine:3.20 getent hosts static.crates.io | grep -Fq '{{ docker_daemon_dns }}'" || status=1
+check "stock Rust container uses transparent Cargo cache" docker run --rm rust:latest sh -c "mkdir -p /tmp/cargo-check/src && cd /tmp/cargo-check && printf '[package]\nname = \"cache-check\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\nserde = \"1\"\n' > Cargo.toml && touch src/lib.rs && cargo fetch" || status=1
+{% endif %}
 check "Go module cache reachable" curl -fsS "http://go-cache.${DOMAIN}:{{ go_cache_port }}/healthz" || status=1
+{% if go_cache_transparent_enabled %}
+check "Docker resolves Go proxy through transparent cache" bash -c "docker run --rm alpine:3.20 getent hosts proxy.golang.org | grep -Fq '{{ docker_daemon_dns }}'" || status=1
+check "stock Go container uses transparent Go module cache" docker run --rm golang:latest sh -c "mkdir -p /tmp/go-check && cd /tmp/go-check && go mod init cache-check && go mod download github.com/google/uuid@v1.6.0" || status=1
+{% endif %}
 {% if user_setup_enabled and user_setup_configure_package_mirrors %}
 check "Cargo sparse index configured" bash -c "grep -Fq '{{ user_setup_cargo_registry }}' '{{ cargo_home }}/config.toml'" || status=1
 check "npm uses local cache" bash -c "grep -Fq 'registry={{ user_setup_npm_registry }}' '{{ user_setup_home }}/.npmrc'" || status=1
@@ -230,6 +239,28 @@ FROM python:latest
 RUN python -m pip download --no-deps --dest /tmp requests
 DOCKERFILE
   check "stock Python build uses transparent PyPI cache" docker build --no-cache "${tmp}/pypi" || status=1
+{% endif %}
+{% if cargo_cache_transparent_enabled %}
+  mkdir -p "${tmp}/cargo"
+  cat >"${tmp}/cargo/Dockerfile" <<'DOCKERFILE'
+FROM rust:latest
+WORKDIR /src
+RUN mkdir src \
+ && printf '[package]\nname = "cache-check"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]\nserde = "1"\n' > Cargo.toml \
+ && touch src/lib.rs \
+ && cargo fetch
+DOCKERFILE
+  check "stock Rust build uses transparent Cargo cache" docker build --no-cache "${tmp}/cargo" || status=1
+{% endif %}
+{% if go_cache_transparent_enabled %}
+  mkdir -p "${tmp}/go"
+  cat >"${tmp}/go/Dockerfile" <<'DOCKERFILE'
+FROM golang:latest
+WORKDIR /src
+RUN go mod init cache-check \
+ && go mod download github.com/google/uuid@v1.6.0
+DOCKERFILE
+  check "stock Go build uses transparent Go module cache" docker build --no-cache "${tmp}/go" || status=1
 {% endif %}
   cat >"${tmp}/Dockerfile" <<'DOCKERFILE'
 FROM alpine:3.20
