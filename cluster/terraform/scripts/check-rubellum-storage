@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""Refuse node-local fallback storage when the durable host bind mount is absent."""
+import json
+import subprocess
+import sys
+
+node, host_path, node_path = sys.argv[1:]
+try:
+    # Confirm this is a node in the selected Kubernetes cluster, not just a
+    # similarly named Docker container from another cluster.
+    subprocess.run(
+        ["kubectl", "get", "node", node, "-o", "name"], check=True,
+        stdout=subprocess.DEVNULL,
+    )
+    inspected = subprocess.run(
+        ["docker", "inspect", node], check=True, capture_output=True, text=True,
+    )
+    mounts = json.loads(inspected.stdout)[0]["Mounts"]
+    if not any(
+        mount["Type"] == "bind"
+        and mount["Source"] == host_path
+        and mount["Destination"] == node_path
+        and mount["RW"]
+        for mount in mounts
+    ):
+        raise ValueError(f"missing writable bind mount {host_path} -> {node_path}")
+    subprocess.run(["docker", "exec", node, "test", "-d", node_path], check=True)
+except (subprocess.CalledProcessError, ValueError, KeyError) as error:
+    sys.exit(
+        f"Rubellum storage check failed on {node}: {error}\n"
+        "Run bootstrap to generate the host mount configuration, then recreate "
+        "KIND with that configuration before deploying. No ephemeral fallback "
+        "is allowed. See cluster/terraform/README.md."
+    )
+print(f"Rubellum durable storage verified: {host_path} -> {node}:{node_path}")

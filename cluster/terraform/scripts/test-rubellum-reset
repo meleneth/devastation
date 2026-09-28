@@ -1,0 +1,101 @@
+#!/usr/bin/python3
+"""Exercise a real KIND reset with disposable Rubellum data, never the main cluster."""
+import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import uuid
+
+import yaml
+from jinja2 import Environment, StrictUndefined
+
+cluster_root = Path(__file__).resolve().parents[2]
+name = f"rubellum-storage-check-{uuid.uuid4().hex[:8]}"
+scratch = Path(tempfile.mkdtemp(prefix=f"{name}-"))
+host_data = scratch / "data"
+host_data.mkdir()
+environment = {**os.environ, "KUBECONFIG": str(scratch / "kubeconfig")}
+terraform = os.environ.get("TERRAFORM", str(Path.home() / ".tfenv/bin/terraform"))
+image = "registry.deva.station/meleneth/rubellum:393e3a15e1d2"
+
+
+def run(*args, capture=False, input=None):
+    result = subprocess.run(
+        args, env=environment, text=True, input=input, check=True,
+        stdout=subprocess.PIPE if capture else None,
+    )
+    return result.stdout.strip() if capture else None
+
+
+jinja = Environment(undefined=StrictUndefined)
+jinja.filters["to_json"] = json.dumps
+template = jinja.from_string(
+    (cluster_root.parent / "templates/kind-config.yml.j2").read_text()
+)
+config = yaml.safe_load(template.render(
+    kind_cluster_name=name, kind_api_port=0, devastation_domain="deva.station",
+    kind_extra_mounts=[{"hostPath": str(host_data), "containerPath": "/var/local/rubellum"}],
+))
+# Avoid the main cluster's host HTTP ports. The production mount is unchanged.
+config["nodes"][0].pop("extraPortMappings")
+(scratch / "kind.yml").write_text(yaml.safe_dump(config))
+encoded = run(
+    terraform, f"-chdir={cluster_root / 'terraform'}", "console",
+    f"-var=rubellum_node_name={name}-control-plane",
+    f"-var=rubellum_host_path={host_data}",
+    capture=True, input="jsonencode(local.mirror_yaml)\n",
+)
+documents = list(yaml.safe_load_all(json.loads(json.loads(encoded))))
+selected = []
+for doc in documents:
+    if doc["kind"] not in ("Namespace", "PersistentVolume", "PersistentVolumeClaim", "Deployment"):
+        continue
+    if doc["metadata"]["name"] not in ("rubellum", "rubellum-data"):
+        continue
+    if doc["kind"] == "Namespace":
+        doc["metadata"]["labels"] = {}
+    if doc["kind"] == "Deployment":
+        doc["spec"]["template"]["metadata"]["annotations"] = {"sidecar.istio.io/inject": "false"}
+        image = doc["spec"]["template"]["spec"]["containers"][0]["image"]
+    selected.append(doc)
+(scratch / "appliance.yml").write_text(yaml.safe_dump_all(selected))
+
+
+def boot():
+    run("kind", "create", "cluster", "--name", name, "--config", str(scratch / "kind.yml"),
+        "--image", "kindest/node:v1.30.0", "--wait", "120s")
+    run(str(cluster_root / "terraform/scripts/check-rubellum-storage"),
+        f"{name}-control-plane", str(host_data), "/var/local/rubellum")
+    run("kind", "load", "docker-image", image, "--name", name)
+    run("kubectl", "apply", "-f", str(scratch / "appliance.yml"))
+    run("kubectl", "-n", "rubellum", "rollout", "status", "deployment/rubellum", "--timeout=240s")
+
+
+def inside(*args):
+    return run("kubectl", "-n", "rubellum", "exec", "deployment/rubellum", "--", *args, capture=True)
+
+
+try:
+    print(f"Isolated reset test: {name}; artifacts: {scratch}", flush=True)
+    boot()
+    sql = ("CREATE TABLE cluster_reset_probe (value text); "
+           "INSERT INTO cluster_reset_probe VALUES ('survived-kind-reset');")
+    inside("s6-setuidgid", "postgres", "psql", "-h", "/run/postgresql", "-d", "rubellum", "-c", sql)
+    inside("redis-cli", "SET", "cluster-reset-probe", "survived-kind-reset")
+    secret_hash = inside("sha256sum", "/data/config/secret_key_base")
+    before_uid = run("kubectl", "get", "namespace", "kube-system", "-o", "jsonpath={.metadata.uid}", capture=True)
+    print("Removing the disposable cluster with the appliance running...", flush=True)
+    run("kind", "delete", "cluster", "--name", name)
+    boot()
+    after_uid = run("kubectl", "get", "namespace", "kube-system", "-o", "jsonpath={.metadata.uid}", capture=True)
+    assert before_uid != after_uid, "Cluster was not actually recreated"
+    value = inside("s6-setuidgid", "postgres", "psql", "-h", "/run/postgresql", "-d", "rubellum",
+                   "-tAc", "SELECT value FROM cluster_reset_probe")
+    assert value == "survived-kind-reset", value
+    assert inside("redis-cli", "GET", "cluster-reset-probe") == "survived-kind-reset"
+    assert inside("sha256sum", "/data/config/secret_key_base") == secret_hash
+    print("PASS: PostgreSQL row, Redis value and instance secret survived KIND deletion/recreation.", flush=True)
+finally:
+    run("kind", "delete", "cluster", "--name", name)
+    print(f"Disposable host data and manifests retained at {scratch}", flush=True)

@@ -2,6 +2,7 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: {{ kind_cluster_name }}
 networking:
+  ipFamily: ipv4
   apiServerAddress: "127.0.0.1"
   apiServerPort: {{ kind_api_port }}
 containerdConfigPatches:
@@ -10,6 +11,14 @@ containerdConfigPatches:
       ca_file = "/etc/containerd/certs.d/registry.{{ devastation_domain }}/ca.crt"
 nodes:
   - role: control-plane
+{% if kind_extra_mounts | default([]) | length > 0 %}
+    extraMounts:
+{% for mount in kind_extra_mounts %}
+      - hostPath: {{ mount.hostPath | to_json }}
+        containerPath: {{ mount.containerPath | to_json }}
+        readOnly: false
+{% endfor %}
+{% endif %}
     extraPortMappings:
       - containerPort: 80
         hostPort: 8088

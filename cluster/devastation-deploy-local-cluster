@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TF_DIR="${ROOT}/cluster/terraform"
+TERRAFORM="${TERRAFORM:-${HOME}/.tfenv/bin/terraform}"
+
+if [[ ! -x "$TERRAFORM" ]]; then
+  TERRAFORM="$(command -v terraform || true)"
+fi
+
+if [[ -z "$TERRAFORM" || ! -x "$TERRAFORM" ]]; then
+  echo "terraform not found; source your shell profile or set TERRAFORM=/path/to/terraform" >&2
+  exit 1
+fi
+
+if [[ "${CLUSTER_DEPLOY_SKIP_SUDO_CHECK:-0}" != "1" ]]; then
+  echo "Checking sudo access for root-owned devastation TLS keys..."
+  sudo -v
+fi
+
+cd "$TF_DIR"
+"$TERRAFORM" init
+# These terraform_data resources run kubectl, so Terraform cannot detect that a
+# KIND reset erased the Kubernetes objects. Reconcile them on every deployment.
+"$TERRAFORM" apply \
+  -replace=terraform_data.metallb \
+  -replace=terraform_data.tls_secrets \
+  -replace=terraform_data.apps \
+  "$@"

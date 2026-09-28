@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Pre-create KIND's Docker network: KIND otherwise attempts a dual-stack bridge,
+# even for IPv4 Kubernetes clusters. Never replace an existing network implicitly.
+networks="$(docker network ls --filter name='^kind$' --format '{{.Name}}')"
+if [[ "$networks" == "kind" ]]; then
+  ipv6="$(docker network inspect kind --format '{{.EnableIPv6}}')"
+  if [[ "$ipv6" != "false" ]]; then
+    echo 'KIND network has IPv6 enabled; migrate its attached nodes to an IPv4-only network before continuing.' >&2
+    exit 1
+  fi
+  echo 'KIND IPv4 network already exists'
+else
+  docker network create --driver bridge --ipv6=false \
+    --opt com.docker.network.bridge.enable_ip_masquerade=true \
+    --opt com.docker.network.driver.mtu=1500 kind
+  echo 'Created KIND IPv4 network'
+fi

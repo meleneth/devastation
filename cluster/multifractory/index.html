@@ -68,6 +68,31 @@
       line-height: 1.1;
     }
 
+    h2 a {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .site-favicon {
+      display: inline-grid;
+      place-items: center;
+      flex: 0 0 1.25rem;
+      width: 1.25rem;
+      height: 1.25rem;
+      border-radius: 3px;
+      background: var(--border-color);
+      color: var(--text-color);
+      font-size: 0.75rem;
+      line-height: 1;
+    }
+
+    .site-favicon img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
     a {
       color: var(--link-color);
       text-decoration: none;
@@ -84,6 +109,15 @@
       border: 0;
       border-top: 1px solid var(--border-color);
       background: #fff;
+    }
+
+    .link-preview {
+      display: grid;
+      place-content: center;
+      min-height: 400px;
+      padding: 1.5rem;
+      border-top: 1px solid var(--border-color);
+      text-align: center;
     }
 
     .toolbar {
@@ -116,7 +150,7 @@
 <body>
   <header>
     <h1>multifractory</h1>
-    <p class="subtitle">Every registered custom deva.station service, live in one page.</p>
+    <p class="subtitle">Your local services and sites, together in one page.</p>
     <div class="toolbar">
       <button id="reload" type="button">Reload all frames</button>
       <span class="count" id="count"></span>
@@ -128,19 +162,22 @@
       { name: "avatars", link: "https://avatars.deva.station" },
       { name: "cnegng-docs", link: "https://cnegng-docs.deva.station" },
       { name: "devblog", link: "https://devblog.deva.station" },
-      { name: "datawires", link: "https://datawires.deva.station" },
+      { name: "datawires", link: "https://datawires.deva.station", icon: "/icon.svg", deferIcon: true },
+      { name: "gitlab", link: "https://gitlab.deva.station", embed: false },
       { name: "hiveware", link: "https://hiveware.deva.station" },
       { name: "js-melstars", link: "https://js-melstars.deva.station" },
       { name: "liz", link: "https://liz.deva.station" },
-      { name: "login", link: "https://login.deva.station" },
-      { name: "naughtsea", link: "https://naughtsea.deva.station" },
-      { name: "pymaker", link: "https://pymaker.deva.station" },
-      { name: "rubymaker", link: "https://rubymaker.deva.station" },
-      { name: "smlmaker", link: "https://smlmaker.deva.station" },
+      { name: "naughtsea", link: "https://naughtsea.deva.station", icon: "/boat.ico" },
+      { name: "pymaker", link: "https://pymaker.deva.station", icon: "/vite.svg" },
+      { name: "rubellum", link: "https://rubellum.deva.station" },
+      { name: "rubymaker", link: "https://rubymaker.deva.station", icon: "/vite.svg" },
+      { name: "smlmaker", link: "https://smlmaker.deva.station", icon: "/vite.svg" },
       { name: "templator", link: "https://templator.deva.station" },
-      { name: "vjn", link: "https://vjn.deva.station" },
+      { name: "vjn", link: "https://vjn.deva.station", icon: "/111.ico" },
       { name: "vuemaker", link: "https://vuemaker.deva.station" },
-      { name: "webhaxe", link: "https://webhaxe.demo.deva.station" }
+      { name: "webhaxe", link: "https://webhaxe.demo.deva.station" },
+      { name: "whirred.deva.station", link: "https://whirred.deva.station" },
+      { name: "whirred.io", link: "https://whirred.io" }
     ];
 
     const grid = document.getElementById("grid");
@@ -160,21 +197,64 @@
       const frame = document.createElement("iframe");
 
       link.href = item.link;
-      link.textContent = item.name;
-      frame.src = item.link;
+      const faviconBox = document.createElement("span");
+      const fallback = document.createElement("span");
+      const favicon = document.createElement("img");
+      const faviconURL = new URL(item.icon || "/favicon.ico", item.link).href;
+
+      faviconBox.className = "site-favicon";
+      faviconBox.setAttribute("aria-hidden", "true");
+      fallback.textContent = item.name[0].toUpperCase();
+      favicon.alt = "";
+      favicon.width = 20;
+      favicon.height = 20;
+      favicon.hidden = true;
+      favicon.referrerPolicy = "no-referrer";
+      favicon.addEventListener("load", () => {
+        favicon.hidden = false;
+        fallback.hidden = true;
+      });
+      favicon.addEventListener("error", () => {
+        favicon.hidden = true;
+        fallback.hidden = false;
+      });
+      if (!item.deferIcon) favicon.src = faviconURL;
+      faviconBox.append(fallback, favicon);
+      link.append(faviconBox, document.createTextNode(item.name));
+
+      // An SSO frame may establish the cookie needed to fetch its icon.
+      frame.addEventListener("load", () => {
+        if (favicon.naturalWidth === 0) favicon.src = faviconURL;
+      });
+      frame.dataset.src = item.link;
+      if (item.embed !== false) frame.src = item.link;
       frame.loading = "eager";
       frame.referrerPolicy = "no-referrer";
       frame.title = item.name;
 
       heading.appendChild(link);
       card.appendChild(heading);
-      card.appendChild(frame);
+      if (item.embed === false) {
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        const preview = document.createElement("div");
+        const open = document.createElement("a");
+        preview.className = "link-preview";
+        open.href = item.link;
+        open.target = "_blank";
+        open.rel = "noopener noreferrer";
+        open.textContent = `Open ${item.name} in a new tab`;
+        preview.appendChild(open);
+        card.appendChild(preview);
+      } else {
+        card.appendChild(frame);
+      }
       grid.appendChild(card);
     }
 
     document.getElementById("reload").addEventListener("click", () => {
-      for (const [index, frame] of [...document.querySelectorAll("iframe")].entries()) {
-        loadFrame(frame, items[index].link);
+      for (const frame of document.querySelectorAll("#grid iframe")) {
+        loadFrame(frame, frame.dataset.src);
       }
     });
   </script>

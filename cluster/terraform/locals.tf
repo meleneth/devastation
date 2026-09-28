@@ -72,16 +72,6 @@ locals {
       container_port = 80
       replicas       = 2
     }
-    login = {
-      namespace      = "default"
-      hostname       = "login.${var.domain}"
-      ip             = "172.30.42.86"
-      image          = "${var.local_registry}/devastation/login"
-      source_image   = "${var.local_registry}/devastation/login"
-      service_port   = 80
-      container_port = 8000
-      replicas       = 2
-    }
     naughtsea = {
       namespace      = "naughtsea"
       hostname       = "naughtsea.${var.domain}"
@@ -101,6 +91,16 @@ locals {
       service_port   = 8000
       container_port = 8000
       replicas       = 2
+    }
+    rubellum = {
+      namespace      = "rubellum"
+      hostname       = "rubellum.${var.domain}"
+      ip             = "172.30.42.98"
+      image          = "${var.local_registry}/meleneth/rubellum:${var.rubellum_image_tag}"
+      source_image   = "${var.local_registry}/meleneth/rubellum:${var.rubellum_image_tag}"
+      service_port   = 80
+      container_port = 3000
+      replicas       = 1
     }
     rubymaker = {
       namespace      = "rubymaker"
@@ -165,6 +165,12 @@ locals {
   }
 
   edge_only_apps = {
+    whirred = {
+      namespace    = "default"
+      hostname     = "whirred.${var.domain}"
+      ip           = "172.30.42.97"
+      service_port = 80
+    }
     datawires = {
       namespace    = "default"
       hostname     = "datawires.${var.domain}"
@@ -284,6 +290,11 @@ locals {
     ]
   ])
 
+  nginx_ipv4_apps = toset([
+    "cnegng-docs", "devblog", "hiveware", "liz", "naughtsea", "pymaker",
+    "rubymaker", "smlmaker", "templator", "vjn", "vuemaker"
+  ])
+
   app_documents = flatten([
     for name, app in local.apps : [
       {
@@ -297,7 +308,7 @@ locals {
             "app.kubernetes.io/part-of" = "sectorfour-mirror"
           }
         }
-        spec = {
+        spec = merge({
           replicas = app.replicas
           selector = { matchLabels = { app = name } }
           template = {
@@ -310,16 +321,18 @@ locals {
                 "sidecar.istio.io/inject" = "true"
               }
             }
-            spec = {
-              containers = [{
+            spec = merge({
+              containers = [merge({
                 name            = name
                 image           = app.image
                 imagePullPolicy = "IfNotPresent"
                 ports           = [{ name = "http", containerPort = app.container_port }]
-              }]
-            }
+                }, contains(local.nginx_ipv4_apps, name) ? {
+                command = ["/bin/sh", "-ec", file("${path.module}/../../templates/nginx-ipv4-start.sh")]
+              } : {}, try(local.app_container_overrides[name], {}))]
+            }, try(local.app_pod_overrides[name], {}))
           }
-        }
+        }, try(local.app_deployment_overrides[name], {}))
       },
       {
         apiVersion = "v1"
@@ -365,7 +378,7 @@ locals {
     ]
   ])
 
-  mirror_yaml = join("\n---\n", [for doc in concat(local.namespace_documents, local.gateway_documents, local.edge_only_documents, local.app_documents) : yamlencode(doc)])
+  mirror_yaml = join("\n---\n", [for doc in concat(local.namespace_documents, local.storage_documents, local.gateway_documents, local.edge_only_documents, local.app_documents) : yamlencode(doc)])
 
   metallb_yaml = join("\n---\n", [
     yamlencode({

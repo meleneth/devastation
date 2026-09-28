@@ -31,6 +31,24 @@
     group: root
     mode: "0755"
 
+# These directories live on the host, outside KIND's disposable node containers.
+# Do not recurse or reset existing ownership: appliances manage their own data.
+- name: Check persistent KIND host directories
+  ansible.builtin.stat:
+    path: "{{ item.hostPath }}"
+  loop: "{{ kind_extra_mounts | default([]) }}"
+  register: kind_host_directories
+
+- name: Create missing persistent KIND host directories
+  ansible.builtin.file:
+    path: "{{ item.item.hostPath }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ kind_host_directories.results }}"
+  when: not item.stat.exists
+
 - name: Write KIND cluster config
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../templates/kind-config.yml.j2"
@@ -43,6 +61,14 @@
   ansible.builtin.command: "kind get clusters"
   register: kind_clusters
   changed_when: false
+
+- name: Ensure KIND Docker network is IPv4-only
+  ansible.builtin.command:
+    argv:
+      - bash
+      - "{{ playbook_dir }}/../bin/devastation-kind-network"
+  register: kind_ipv4_network
+  changed_when: "'Created KIND IPv4 network' in kind_ipv4_network.stdout"
 
 - name: Create KIND cluster
   ansible.builtin.command: "kind create cluster --name {{ kind_cluster_name }} --config {{ devastation_paths.kind }}/kind-config.yml --image {{ kind_node_image }}"
